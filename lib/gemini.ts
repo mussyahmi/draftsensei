@@ -33,3 +33,8 @@ export const shouldTryNextModel = (status: number) =>
 
 export const endpoint = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+// Flash answers in a second or two most days, but under load it has taken
+// close to a minute, which is useless mid-draft and long enough for a proxy
+// in front of us to give up. Abandon a stalled model and try the next.
+export const MODEL_TIMEOUT_MS = 15_000;

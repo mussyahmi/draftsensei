@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Check, Copy, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { answerLines } from '@/lib/answer-text';
 
 export type Answer = { text: string; prompt: string; model: string };
 
@@ -50,9 +51,22 @@ export function AnswerBar({ prompt, answer, loading, error, asksToday, onAsk }: 
                 Picks changed — ask again
               </p>
             )}
-            <pre className="whitespace-pre-wrap font-sans text-[15px] leading-snug sm:text-base">
-              {answer.text}
-            </pre>
+            <div className="space-y-0.5 text-[15px] leading-snug sm:text-base">
+              {answerLines(answer.text).map((line, i) => (
+                <p key={i} className={cn('whitespace-pre-wrap', line.bullet && 'pl-4 -indent-4')}>
+                  {line.bullet && <span className="text-primary">• </span>}
+                  {line.spans.map((span, j) =>
+                    span.bold ? (
+                      <strong key={j} className="font-semibold text-primary">
+                        {span.text}
+                      </strong>
+                    ) : (
+                      <span key={j}>{span.text}</span>
+                    ),
+                  )}
+                </p>
+              ))}
+            </div>
           </div>
         )}
 

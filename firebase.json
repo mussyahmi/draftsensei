@@ -1,5 +1,15 @@
 {
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": "hosting",
+    "ignore": ["firebase.json", "**/.*"],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": { "serviceId": "draftsensei", "region": "asia-southeast1" }
+      }
+    ]
   }
 }

@@ -7,6 +7,7 @@ import {
   shouldTryNextModel,
   modelChain,
   requestBody,
+  MODEL_TIMEOUT_MS,
   type GeminiPayload,
 } from '@/lib/gemini';
 
@@ -34,7 +35,10 @@ export async function POST(request: Request) {
     process.env.GEMINI_FALLBACK_MODEL || FALLBACK_MODEL,
   );
 
+  const timeout = Number(process.env.GEMINI_TIMEOUT_MS) || MODEL_TIMEOUT_MS;
+
   let lastError = 'Gemini did not answer.';
+  let timedOut = false;
 
   for (const model of models) {
     let response: Response;
@@ -43,9 +47,16 @@ export async function POST(request: Request) {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify(requestBody(prompt)),
+        signal: AbortSignal.timeout(timeout),
       });
+      timedOut = false;
     } catch {
-      return NextResponse.json({ error: 'Could not reach Gemini.' }, { status: 502 });
+      // Either the model stalled past our deadline or the network is gone.
+      // Both are worth retrying on the next model; only the last one decides
+      // what we tell the player.
+      timedOut = true;
+      lastError = `${model} took too long to answer.`;
+      continue;
     }
 
     if (response.ok) {
@@ -67,7 +78,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { error: `No model could answer. ${lastError}` },
-    { status: 429 },
+    { error: timedOut ? lastError : `No model could answer. ${lastError}` },
+    { status: timedOut ? 504 : 429 },
   );
 }
