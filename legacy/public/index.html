@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft Helper — Mobile Legends</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="bar">
+  <h1>Draft Helper</h1>
+  <div class="lane-pick">
+    <span>I'm playing</span>
+    <div class="lanes" id="my-lane"></div>
+  </div>
+  <button class="ghost" id="edit-pool">My heroes</button>
+  <button class="ghost" id="new-draft">New draft</button>
+</header>
+
+<nav class="steps" id="steps">
+  <button data-step="1"><b>1</b> Picks</button>
+  <button data-step="2"><b>2</b> My build</button>
+</nav>
+
+<main>
+  <section class="board" id="board">
+    <div class="side side--team" data-side="team">
+      <h2>My team</h2>
+      <div class="entry">
+        <input type="text" autocomplete="off" spellcheck="false" placeholder="Type a hero…">
+        <ul class="suggest" hidden></ul>
+      </div>
+      <ol class="chips"></ol>
+      <p class="warn" hidden></p>
+    </div>
+
+    <div class="side side--enemy" data-side="enemy">
+      <h2>Enemy</h2>
+      <div class="entry">
+        <input type="text" autocomplete="off" spellcheck="false" placeholder="Type a hero…">
+        <ul class="suggest" hidden></ul>
+      </div>
+      <ol class="chips"></ol>
+      <p class="warn" hidden></p>
+    </div>
+  </section>
+
+  <p class="hint" id="hint"></p>
+
+  <section class="mine" id="mine" hidden>
+    <h2>The hero I picked</h2>
+    <div class="entry">
+      <input type="text" autocomplete="off" spellcheck="false" placeholder="Type a hero…" id="my-hero">
+      <ul class="suggest" hidden></ul>
+    </div>
+    <p class="chosen" id="chosen"></p>
+  </section>
+</main>
+
+<dialog id="pool">
+  <h2>My heroes</h2>
+  <p class="subtle">The heroes you actually play. When the lane you're on has a list
+  here, the pick prompt asks for a hero from it and nothing else.</p>
+  <div id="pool-lanes"></div>
+  <button class="copy" id="pool-done">Done</button>
+</dialog>
+
+<footer class="prompt">
+  <pre id="prompt-text"></pre>
+  <button class="copy" id="copy">Copy prompt</button>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

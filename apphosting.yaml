@@ -1,0 +1,38 @@
+# Firebase App Hosting. The Gemini key is held in Secret Manager, never in the
+# repo — create it once with:
+#   firebase apphosting:secrets:set GEMINI_API_KEY
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  maxInstances: 2
+  minInstances: 0
+  concurrency: 80
+
+env:
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+    availability:
+      - RUNTIME
+
+  # Public by design: these name the Firebase project and ship in the page.
+  # They are needed at build time so Next can inline them.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyAPNobAhY0Vznoqql4tWpNPFZEJ4445u0s
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: draftsensei.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: draftsensei
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:128228395259:web:de4a37f52b309d8bea085e
+    availability:
+      - BUILD
+      - RUNTIME

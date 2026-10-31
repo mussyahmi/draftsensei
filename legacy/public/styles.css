@@ -1,0 +1,410 @@
+:root {
+  --bg: #0b1221;
+  --panel: #141f36;
+  --panel-2: #1b2945;
+  --line: #27375a;
+  --ink: #e9eefb;
+  --muted: #8296b8;
+  --ally: #4a8bff;
+  --enemy: #e2384a;
+  --gold: #f0b43c;
+  --radius: 4px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(900px 500px at 50% -10%, #16253f 0%, var(--bg) 70%);
+  color: var(--ink);
+  font: 400 15px/1.5 Barlow, system-ui, sans-serif;
+}
+
+h1, h2, .lanes button, .steps button, .copy, .chip-name {
+  font-family: 'Barlow Condensed', Barlow, sans-serif;
+  letter-spacing: .02em;
+}
+
+/* ---------- top bar ---------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bar h1 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.lane-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: auto;
+  color: var(--muted);
+}
+
+.lanes { display: flex; gap: 4px; }
+
+.lanes button {
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 5px 13px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.lanes button[aria-pressed="true"] {
+  background: var(--ally);
+  border-color: var(--ally);
+  color: #04102a;
+  font-weight: 700;
+}
+
+.ghost {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ghost:hover { color: var(--ink); border-color: var(--muted); }
+
+/* ---------- steps ---------- */
+
+.steps {
+  display: flex;
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.steps button {
+  flex: 1;
+  background: var(--bg);
+  color: var(--muted);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 13px;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.steps button b {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--line);
+  font-size: 22px;
+}
+
+.steps button[aria-current="true"] {
+  background: var(--panel);
+  color: var(--ink);
+  border-bottom-color: var(--gold);
+}
+
+.steps button[aria-current="true"] b { color: var(--gold); }
+
+/* ---------- board ---------- */
+
+main {
+  flex: 1;
+  padding: 26px 24px 30px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.side {
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 18px;
+}
+
+.side--team { --edge: var(--ally); }
+.side--enemy { --edge: var(--enemy); }
+
+.side h2, .mine h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--edge, var(--muted));
+}
+
+/* ---------- hero entry ---------- */
+
+.entry { position: relative; }
+
+.entry input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: 500 17px Barlow, sans-serif;
+  padding: 10px 12px;
+}
+
+.entry input:focus {
+  outline: 2px solid var(--edge, var(--gold));
+  outline-offset: 1px;
+}
+
+.suggest {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .45);
+}
+
+.suggest li {
+  padding: 7px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.suggest li[aria-selected="true"] { background: var(--edge, var(--gold)); color: #04102a; }
+
+/* ---------- chips ---------- */
+
+.chips {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 60px;
+}
+
+.chips:empty::after {
+  content: attr(data-empty);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+}
+
+.chip.is-active { border-color: var(--gold); border-left-color: var(--gold); }
+
+.chip-name { font-size: 18px; font-weight: 600; margin-right: auto; }
+
+.chip .lanes button { padding: 3px 8px; font-size: 14px; }
+.chip .lanes button[aria-pressed="true"] { background: var(--edge); border-color: var(--edge); }
+
+.chip .drop {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.chip .drop:hover { color: var(--enemy); }
+
+.hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------- step 3 ---------- */
+
+.mine {
+  max-width: 420px;
+  margin: 0 auto;
+  --edge: var(--gold);
+}
+
+.chosen { font-size: 19px; margin: 14px 0 0; }
+.chosen:empty::after { content: 'Nothing picked yet.'; color: var(--muted); font-size: 15px; font-style: italic; }
+
+/* ---------- prompt ---------- */
+
+.prompt {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding: 16px 24px;
+  background: #091020;
+  border-top: 1px solid var(--line);
+}
+
+.prompt pre {
+  flex: 1;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: 400 13.5px/1.6 ui-monospace, 'SF Mono', Menlo, monospace;
+  color: #c9d6ef;
+}
+
+.copy {
+  align-self: center;
+  background: var(--gold);
+  color: #2a1c00;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 13px 26px;
+  font-size: 19px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.copy:hover { filter: brightness(1.08); }
+.copy.copied { background: #4ad07a; color: #052612; }
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+@media (max-width: 760px) {
+  .bar { flex-wrap: wrap; gap: 14px; }
+  .board { grid-template-columns: 1fr; }
+  .prompt { flex-direction: column; }
+  .copy { align-self: stretch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+#hint {
+  max-width: 1040px;
+  margin: 14px auto 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.warn {
+  margin: 12px 0 0;
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chip.is-clash .lanes button[aria-pressed="true"] {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #2a1c00;
+}
+
+/* ---------- my heroes ---------- */
+
+#pool {
+  width: min(560px, 92vw);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink);
+  padding: 24px;
+}
+
+#pool::backdrop { background: rgba(4, 9, 20, .72); }
+
+#pool h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.subtle {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 52ch;
+}
+
+.pool-lane { margin-bottom: 18px; --edge: var(--ally); }
+
+.pool-lane > h3 {
+  margin: 0 0 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pool-heroes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pool-heroes:empty::after {
+  content: 'Anything goes.';
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.pool-hero {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 6px 4px 12px;
+  font-size: 14px;
+}
+
+.pool-hero button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.pool-hero button:hover { color: var(--enemy); }
+
+#pool-done { width: 100%; margin-top: 4px; }

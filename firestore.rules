@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// One document per account, reachable only by that account. Nothing here is
+// readable by anyone else, signed in or not.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /drafts/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
