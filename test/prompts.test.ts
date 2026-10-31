@@ -13,7 +13,7 @@ const draft: Draft = {
 
 test('pick prompt asks for my lane and lists picks with their lanes', () => {
   expect(pickPrompt(draft)).toBe([
-    'suggest mid lane hero',
+    'suggest mobile legends mid lane hero',
     '',
     'enemy pick: eudora (mid lane) masha (roaming)',
     '',
@@ -30,7 +30,7 @@ test('pick prompt says none for a side with no picks yet', () => {
 
 test('build prompt names my hero and lane and asks for the gameplay guide', () => {
   expect(buildPrompt(draft)).toBe([
-    'suggest spell and item build for rafaela (mid lane)',
+    'suggest mobile legends spell and item build for rafaela (mid lane)',
     '',
     'enemy pick: eudora (mid lane) masha (roaming)',
     '',
@@ -47,7 +47,7 @@ test('build prompt names my hero and lane and asks for the gameplay guide', () =
 });
 
 test('build prompt leaves a blank for the hero until one is chosen', () => {
-  expect(buildPrompt({ ...draft, myHero: '' })).toMatch(/^suggest spell and item build for \.\.\. \(mid lane\)/);
+  expect(buildPrompt({ ...draft, myHero: '' })).toMatch(/^suggest mobile legends spell and item build for \.\.\. \(mid lane\)/);
 });
 
 test('every lane key renders its in-game wording', () => {

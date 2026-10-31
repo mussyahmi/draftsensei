@@ -53,7 +53,7 @@ export const poolFor = (pool: Pool | undefined, lane: Lane) => (pool && pool[lan
 export function pickPrompt(draft: Draft, pool?: Pool) {
   const mine = poolFor(pool, draft.myLane);
   return [
-    `suggest ${laneLabel(draft.myLane)} hero`,
+    `suggest mobile legends ${laneLabel(draft.myLane)} hero`,
     '',
     `enemy pick: ${withLanes(draft.picks.enemy)}`,
     '',
@@ -68,7 +68,7 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
 
 export function buildPrompt(draft: Draft) {
   return [
-    `suggest spell and item build for ${(draft.myHero || '...').toLowerCase()} (${laneLabel(draft.myLane)})`,
+    `suggest mobile legends spell and item build for ${(draft.myHero || '...').toLowerCase()} (${laneLabel(draft.myLane)})`,
     '',
     `enemy pick: ${withLanes(draft.picks.enemy)}`,
     '',
