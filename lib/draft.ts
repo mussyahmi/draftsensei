@@ -6,10 +6,26 @@ export type Pick = { hero: string; lane: Lane };
 
 export type Pool = Record<Lane, string[]>;
 
+// The rank whose games the match stats come from. Set once and kept, like
+// the lane: nobody has time to choose it during a draft.
+export type Rank = 'all' | 'epic' | 'legend' | 'mythic' | 'honor' | 'glory';
+
+export const RANKS: { key: Rank; label: string }[] = [
+  { key: 'all', label: 'All ranks' },
+  { key: 'epic', label: 'Epic' },
+  { key: 'legend', label: 'Legend' },
+  { key: 'mythic', label: 'Mythic' },
+  { key: 'honor', label: 'Mythical Honor' },
+  { key: 'glory', label: 'Mythical Glory and up' },
+];
+
 export type Draft = {
   myLane: Lane;
   picks: Record<Side, Pick[]>;
   myHero: string;
+  // Heroes banned by either team; nobody can pick them.
+  bans: string[];
+  rank: Rank;
 };
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -62,6 +78,7 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
     '',
     `my team pick: ${withLanes(draft.picks.team)}`,
     '',
+    ...(draft.bans.length ? [`banned: ${draft.bans.map((h) => h.toLowerCase()).join(', ')}`, ''] : []),
     'answer with hero names, each with a reason of 6 words max',
     'do not suggest a hero already picked by either team',
     ...(mine.length
@@ -87,12 +104,13 @@ export function buildPrompt(draft: Draft) {
     `my team pick: ${withLanes(draft.picks.team)}`,
     '',
     'answer short, no paragraphs:',
-    '- battle spell',
+    '- first line: Battle spell: <name>',
+    '- second line: Emblem: <name> (<its 3 talents>)',
     '- 6 items, numbered 1 to 6, names only, no other notes',
     '- order them by when to buy',
     ...(blessing ? [`- boots first, and name which ${blessing} to put on them`] : []),
     '',
-    'then 3 short lines: which lane to help first, who to use my ult on, our win condition',
+    'then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:',
   ].join('\n');
 }
 
@@ -100,6 +118,8 @@ export const newDraft = (): Draft => ({
   myLane: 'mid',
   picks: { enemy: [], team: [] },
   myHero: '',
+  bans: [],
+  rank: 'all',
 });
 
 export function takenHeroes(draft: Draft) {
@@ -107,6 +127,7 @@ export function takenHeroes(draft: Draft) {
     ...draft.picks.enemy.map((p) => p.hero),
     ...draft.picks.team.map((p) => p.hero),
     ...(draft.myHero ? [draft.myHero] : []),
+    ...draft.bans,
   ];
 }
 

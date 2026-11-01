@@ -9,6 +9,8 @@ const draft: Draft = {
     team: [{ hero: 'Lukas', lane: 'jungle' }, { hero: 'Marcel', lane: 'roam' }],
   },
   myHero: 'Rafaela',
+  bans: [],
+  rank: 'all',
 };
 
 test('pick prompt asks for my lane and lists picks with their lanes', () => {
@@ -34,6 +36,14 @@ test('pick prompt drops the pool limit when every hero in it is taken', () => {
   expect(pickPrompt(draft, pool)).not.toMatch(/only suggest from my heroes/);
 });
 
+test('pick prompt lists bans so they are not suggested', () => {
+  expect(pickPrompt({ ...draft, bans: ['Kagura', 'Ling'] })).toMatch(/\nbanned: kagura, ling\n/);
+});
+
+test('pick prompt leaves bans out when there are none', () => {
+  expect(pickPrompt(draft)).not.toMatch(/banned/);
+});
+
 test('pick prompt says none for a side with no picks yet', () => {
   const empty: Draft = { ...draft, picks: { enemy: [], team: [] } };
   expect(pickPrompt(empty)).toMatch(/enemy pick: none\n\nmy team pick: none\n/);
@@ -48,11 +58,12 @@ test('build prompt names my hero and lane and asks for the gameplay guide', () =
     'my team pick: lukas (jungling) marcel (roaming)',
     '',
     'answer short, no paragraphs:',
-    '- battle spell',
+    '- first line: Battle spell: <name>',
+    '- second line: Emblem: <name> (<its 3 talents>)',
     '- 6 items, numbered 1 to 6, names only, no other notes',
     '- order them by when to buy',
     '',
-    'then 3 short lines: which lane to help first, who to use my ult on, our win condition',
+    'then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:',
   ].join('\n'));
 });
 

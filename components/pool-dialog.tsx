@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { LANES, laneLabel, poolFor, type Lane, type Pool } from '@/lib/draft';
+import { LANES, RANKS, laneLabel, poolFor, type Lane, type Pool, type Rank } from '@/lib/draft';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,19 @@ type Props = {
   pool: Pool;
   onChange: (pool: Pool) => void;
   portraits: Record<string, string | null>;
+  rank: Rank;
+  onRank: (rank: Rank) => void;
 };
 
-export function PoolDialog({ open, onOpenChange, pool, onChange, portraits }: Props) {
+export function PoolDialog({
+  open,
+  onOpenChange,
+  pool,
+  onChange,
+  portraits,
+  rank,
+  onRank,
+}: Props) {
   const add = (lane: Lane, hero: string) => {
     if (poolFor(pool, lane).includes(hero)) return;
     onChange({ ...pool, [lane]: [...poolFor(pool, lane), hero] });
@@ -43,7 +53,26 @@ export function PoolDialog({ open, onOpenChange, pool, onChange, portraits }: Pr
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        {/* Set once: stats from players at your level fit you better than
+            all ranks mixed. */}
+        <label className="flex items-center justify-between gap-3">
+          <span className="font-display text-sm uppercase tracking-wide text-muted-foreground">
+            My rank
+          </span>
+          <select
+            value={rank}
+            onChange={(e) => onRank(e.target.value as Rank)}
+            className="h-10 rounded-lg border border-input bg-background/60 px-3 text-base sm:h-9 sm:text-sm"
+          >
+            {RANKS.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="space-y-6">
           {LANES.map((lane) => (
             <div key={lane.key} className="space-y-2">
               <h3 className="font-display text-sm uppercase tracking-wide text-muted-foreground">

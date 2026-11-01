@@ -40,6 +40,7 @@ import { HeroEntry } from '@/components/hero-entry';
 import { LanePicker } from '@/components/lane-picker';
 import { PickList } from '@/components/pick-list';
 import { PoolDialog } from '@/components/pool-dialog';
+import { BanList } from '@/components/ban-list';
 import { ChangelogDialog } from '@/components/changelog-dialog';
 import type { Release } from '@/lib/changelog';
 import { Button } from '@/components/ui/button';
@@ -65,7 +66,7 @@ const forPhase =
 
 function PhaseTitle({ n, children }: { n: number; children: React.ReactNode }) {
   return (
-    <h2 className="font-display text-base uppercase tracking-wide">
+    <h2 className="font-display text-lg uppercase tracking-wide">
       <span className="text-primary">{n}</span> {children}
     </h2>
   );
@@ -81,6 +82,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   const [pool, setPool] = useState<Pool>(newPool);
   const [poolOpen, setPoolOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+
 
   const [answers, setAnswers] = useState<Record<Phase, Answer | null>>({ pick: null, build: null });
   const [loading, setLoading] = useState<Record<Phase, boolean>>({ pick: false, build: false });
@@ -173,11 +175,17 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       enemy: draft.picks.enemy.map((p) => p.hero),
       team: draft.picks.team.map((p) => p.hero),
       pool: poolFor(pool, draft.myLane),
+      bans: draft.bans,
+      rank: draft.rank,
+      // The enemy in my lane: that matchup counts most.
+      opponent: draft.picks.enemy.find((p) => p.lane === draft.myLane)?.hero,
     }),
     [draft, pool],
   );
 
-  const ask = useCallback(async (phase: Phase, asking: string, board?: Picks) => {
+  // What goes along with the prompt: the board as names for hero picks, my
+  // hero and lane for a build, so the server can look up real stats.
+  const ask = useCallback(async (phase: Phase, asking: string, extra: object) => {
     const fail = (message: string) => setErrors(forPhase<string | null>(phase, message));
     setLoading(forPhase(phase, true));
     setErrors(forPhase<string | null>(phase, null));
@@ -185,7 +193,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       const response = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: asking, build: phase === 'build', picks: board }),
+        body: JSON.stringify({ prompt: asking, build: phase === 'build', ...extra }),
       });
       // A crash upstream answers with an HTML error page, not JSON, so read
       // the body defensively rather than reporting it as a dead network.
@@ -224,8 +232,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     }
   }, []);
 
-  const askPicks = () => ask('pick', prompts.pick, picks);
-  const askBuild = () => ask('build', prompts.build);
+  const askPicks = () => ask('pick', prompts.pick, { picks });
+  const askBuild = () =>
+    ask('build', prompts.build, { hero: draft.myHero, lane: draft.myLane, rank: draft.rank });
 
   /* ---------- the signed-in account ---------- */
 
@@ -329,7 +338,8 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   };
 
   const resetDraft = () => {
-    setDraft((d) => ({ ...newDraft(), myLane: d.myLane }));
+    // Lane and rank are about the player, not the draft, so they stay.
+    setDraft((d) => ({ ...newDraft(), myLane: d.myLane, rank: d.rank }));
     setAnswers({ pick: null, build: null });
     setErrors({ pick: null, build: null });
   };
@@ -392,11 +402,19 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-4">
-        <section className="space-y-4">
+        {/* Groups sit further apart than the parts inside them, so it reads
+            which heading and box belong together. */}
+        <section className="space-y-6">
           <PhaseTitle n={1}>Picks</PhaseTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <BanList
+            bans={draft.bans}
+            unavailable={taken}
+            portraits={portraits}
+            onChange={(bans) => setDraft((d) => ({ ...d, bans }))}
+          />
+          <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2">
             {SIDES.map((side) => (
-              <div key={side.key} className="space-y-3">
+              <div key={side.key} className="space-y-2">
                 <h3
                   className={cn(
                     'font-display text-sm uppercase tracking-widest',
@@ -447,9 +465,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
           />
         </section>
 
-        <section className="space-y-4 border-t border-border pt-6">
+        <section className="space-y-6 border-t border-border pt-8">
           <PhaseTitle n={2}>My build</PhaseTitle>
-          <div className="max-w-sm space-y-3">
+          <div className="max-w-sm space-y-2">
             <h3 className="font-display text-sm uppercase tracking-widest text-primary">
               The hero I picked
             </h3>
@@ -496,6 +514,8 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         pool={pool}
         onChange={setPool}
         portraits={portraits}
+        rank={draft.rank}
+        onRank={(rank) => setDraft((d) => ({ ...d, rank }))}
       />
     </>
   );

@@ -7,6 +7,10 @@ service cloud.firestore {
     match /drafts/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+    // The player's MLBB login token: theirs alone, like the draft.
+    match /mlbb/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
     // usage/{day} holds the shared daily ask count. Only the server touches
     // it, through the admin SDK, which these rules do not apply to; with no
     // rule here, browsers can neither read nor write it.

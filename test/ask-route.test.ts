@@ -7,11 +7,16 @@ import { countAsk } from '../lib/quota-store';
 // The shared count lives in Firestore; here it is a stub that says 42.
 vi.mock('../lib/quota-store', () => ({ countAsk: vi.fn(async () => 42) }));
 
-const ask = (prompt = 'suggest mobile legends mid lane hero', build?: boolean, picks?: unknown) =>
+const ask = (
+  prompt = 'suggest mobile legends mid lane hero',
+  build?: boolean,
+  picks?: unknown,
+  mine?: { hero: string; lane: string },
+) =>
   POST(new Request('http://localhost/api/ask', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt, build, picks }),
+    body: JSON.stringify({ prompt, build, picks, ...mine }),
   }));
 
 const searched = (init: RequestInit) => 'tools' in JSON.parse(String(init.body));
@@ -122,6 +127,47 @@ test('a build ask tells Gemini which items are still in the shop', async () => {
   expect(sent).toMatch(/^suggest a build\n\n/);
   expect(sent).toMatch(/only use items from this list.*\nDominance Ice$/);
   expect(sent).not.toMatch(/Twilight Armor/);
+});
+
+// Angela's top roam builds as the Academy serves them, plus what it takes to
+// name their items and talents.
+const builds = (url: string) => {
+  const page = (records: unknown[]) => new Response(JSON.stringify({ data: { records } }));
+  if (url.includes('/heroes?size')) return page([{ data: { hero_id: 47, hero: { data: { name: 'Angela' } } } }]);
+  if (url.includes('/47/builds?lane=roam')) {
+    return page([{ data: { build: [{
+      build_win_rate: 0.569, build_pick_rate: 0.129,
+      battleskill: { data: { __data: { skillname: 'Flicker' } } },
+      emblem: { data: { emblemname: 'Support' } },
+      equipid: [1, 2], new_rune_skill: [611],
+    }] } }]);
+  }
+  if (url.includes('/emblems')) return page([{ data: { giftid: 611, emblemskill: { skillname: 'Inspire' } } }]);
+  if (url.includes('/equipment')) {
+    return page([
+      { data: { equipid: 1, equipname: 'Flask of the Oasis', equipicon: '' } },
+      { data: { equipid: 2, equipname: 'Glowing Wand', equipicon: '' } },
+    ]);
+  }
+  if (url.includes('arena.rone.dev')) return page([]);
+  return null;
+};
+
+test('a build ask hands Gemini the top builds for my hero and lane', async () => {
+  let sent = '';
+  vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+    const arena = builds(url);
+    if (arena) return arena;
+    sent = promptOf(init);
+    return answer('Flicker');
+  });
+
+  await ask('suggest a build', true, undefined, { hero: 'Angela', lane: 'roam' });
+  expect(sent).toContain([
+    'top builds for this hero and lane from ranked games:',
+    '56.9% win, 12.9% pick: flicker, support emblem (inspire), core items flask of the oasis, glowing wand',
+    'start from the best of these: keep its battle spell, emblem, talents and core items, and choose the other items for this enemy team',
+  ].join('\n'));
 });
 
 test('a build ask still goes out when the item list cannot be fetched', async () => {

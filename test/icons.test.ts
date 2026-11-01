@@ -22,6 +22,17 @@ test('the battle spell line gives the spell name', () => {
   expect(itemOf('**Battle spell**: Flicker (to engage)')).toBe('Flicker');
 });
 
+test('the emblem line gives the emblem name', () => {
+  expect(itemOf('Emblem: Support (Inspire, Bargain Hunter, Focusing Mark)')).toBe('Support');
+  expect(itemOf('- **Emblem:** Tank')).toBe('Tank');
+});
+
+test('a spell written as a bare bullet still gives the spell name', () => {
+  // Gemini sometimes drops the "Battle spell:" label and writes "- Flicker".
+  expect(itemOf('- Flicker')).toBe('Flicker');
+  expect(itemOf('* **Vengeance**')).toBe('Vengeance');
+});
+
 test('lines that are not an item or a spell give nothing', () => {
   expect(itemOf('Help mid first, then roam to gold.')).toBeNull();
   expect(itemOf('')).toBeNull();

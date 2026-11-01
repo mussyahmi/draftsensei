@@ -180,7 +180,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
               Picks changed, ask again
             </p>
           )}
-          <div className="space-y-0.5 text-[15px] leading-snug sm:text-base">
+          <div className="space-y-0.5 text-base leading-snug">
             {blocks.map((block, b) =>
               'items' in block ? (
                 // The six items side by side in buying order, name under icon.
@@ -194,7 +194,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
                           {k + 1}
                         </span>
                       )}
-                      <span className="text-[11px] leading-tight sm:text-xs">{name}</span>
+                      <span className="text-xs leading-tight">{name}</span>
                     </li>
                   ))}
                 </ol>

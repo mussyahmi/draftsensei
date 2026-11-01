@@ -7,7 +7,9 @@ import {
   MODEL_TIMEOUT_MS,
   type GeminiPayload,
 } from '@/lib/gemini';
-import { loadCatalog } from '@/lib/arena';
+import { loadBuilds, loadCatalog } from '@/lib/arena';
+import { buildLines } from '@/lib/builds';
+import { LANES, RANKS } from '@/lib/draft';
 import { matchupData, picksFrom } from '@/lib/matchups';
 import { countAsk } from '@/lib/quota-store';
 
@@ -23,8 +25,11 @@ export async function POST(request: Request) {
   let prompt: unknown;
   let build: unknown;
   let picks: unknown;
+  let hero: unknown;
+  let lane: unknown;
+  let rank: unknown;
   try {
-    ({ prompt, build, picks } = await request.json());
+    ({ prompt, build, picks, hero, lane, rank } = await request.json());
   } catch {
     return NextResponse.json({ error: 'Bad request body.' }, { status: 400 });
   }
@@ -48,6 +53,23 @@ export async function POST(request: Request) {
         '',
         'only use items from this list, written exactly as listed:',
         catalog.items.join('\n'),
+      ].join('\n');
+    }
+  }
+
+  // The Academy knows which builds actually win for this hero in this lane.
+  // Hand Gemini the best few so it keeps their core and adapts the rest.
+  const myLane = LANES.find((l) => l.key === lane)?.key;
+  if (build === true && typeof hero === 'string' && hero && myLane) {
+    const myRank = RANKS.find((r) => r.key === rank)?.key ?? 'all';
+    const lines = buildLines(await loadBuilds(hero, myLane, myRank).catch(() => []));
+    if (lines.length) {
+      asking = [
+        asking,
+        '',
+        'top builds for this hero and lane from ranked games:',
+        ...lines,
+        'start from the best of these: keep its battle spell, emblem, talents and core items, and choose the other items for this enemy team',
       ].join('\n');
     }
   }

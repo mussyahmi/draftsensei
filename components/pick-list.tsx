@@ -67,7 +67,7 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me }: Props
               >
                 {pick.hero}
                 {pick.me && (
-                  <span className="ms-1.5 rounded bg-primary px-1 py-0.5 align-middle font-sans text-[10px] font-semibold uppercase text-primary-foreground">
+                  <span className="ms-1.5 rounded bg-primary px-1.5 py-0.5 align-middle font-sans text-xs font-semibold uppercase text-primary-foreground">
                     you
                   </span>
                 )}

@@ -16,6 +16,7 @@ test('picks rank by win rate gained against the enemy plus with my team', () => 
     against: 0.051,
     alongside: 0.02,
     best: { enemy: 'Sun', gain: 0.031 },
+    opponent: null,
   });
 });
 
@@ -58,4 +59,27 @@ test('the prompt lines show each gain as a signed percentage, with the best matc
 test('with no teammates picked yet, the lines leave the team part out', () => {
   expect(matchupLines([{ hero: 'Saber', against: 0.051, alongside: 0, best: null }], false))
     .toEqual(['saber: +5.1% vs enemy']);
+});
+
+test('the enemy in my lane counts double, and is named on the line', () => {
+  // Jawhead and Saber gain the same overall, but Saber is better into Eudora,
+  // the enemy in my lane, so Saber ranks first.
+  const vsSun2: Gains = new Map([['Jawhead', 0.03], ['Saber', 0.01]]);
+  const vsEudora2: Gains = new Map([['Jawhead', 0.0], ['Saber', 0.02]]);
+  const ranked = rankPicks(['Jawhead', 'Saber'], new Map([['Sun', vsSun2], ['Eudora', vsEudora2]]), [], 'Eudora');
+  expect(ranked.map((r) => r.hero)).toEqual(['Saber', 'Jawhead']);
+  expect(ranked[0].opponent).toEqual({ enemy: 'Eudora', gain: 0.02 });
+  expect(matchupLines([ranked[0]], false)).toEqual([
+    'saber: +3.0% vs enemy (best into eudora +2.0%), vs lane opponent eudora +2.0%',
+  ]);
+});
+
+test('with no enemy in my lane yet, nobody is weighted', () => {
+  const [r] = rankPicks(['Saber'], new Map([['Sun', vsSun]]), [], undefined);
+  expect(r.opponent).toBeNull();
+});
+
+test('a banned hero is not in the running', () => {
+  const lanes = { Jawhead: 'jungle', Saber: 'jungle' } as const;
+  expect(candidatesFor('jungle', [], [], lanes, ['Saber'])).toEqual(['Jawhead']);
 });

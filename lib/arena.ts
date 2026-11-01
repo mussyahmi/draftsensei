@@ -1,3 +1,6 @@
+import { buildsFrom, type Build, type BuildPage } from './builds';
+import type { Lane, Rank } from './draft';
+
 // Rone Arena is a community API over Moonton's own MLBB Academy data, so its
 // item names and icons are the ones the shop uses this patch. We read it on
 // the server for two things: icons beside a build, and the list of items that
@@ -5,15 +8,18 @@
 
 export const ARENA_API = 'https://arena.rone.dev/api';
 
-type Equip = { data: { equipname: string; equipicon: string } };
+type Equip = { data: { equipid?: number; equipname: string; equipicon: string } };
 type Spell = { data: { __data: { skillname: string; skillicon: string } } };
+type Role = { data: { emblem_title?: string; emblem_icon?: string } };
 type Page<T> = { data?: { records?: T[] } };
 
 export type Catalog = {
-  // Every item and battle spell still in the game, by its in-game name.
+  // Every item, battle spell and emblem still in the game, by its in-game name.
   icons: Map<string, string | null>;
   // The shop's item names, for the build prompt.
   items: string[];
+  // Item names by the id the Academy's builds refer to them with.
+  ids: Map<number, string>;
 };
 
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -21,20 +27,31 @@ const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 // The Academy keeps removed items around with a marker on the name.
 const removed = (name: string) => /\(discarded\)/i.test(name);
 
-export function catalogFrom(equipment: Page<Equip>, spells: Page<Spell>): Catalog {
+export function catalogFrom(
+  equipment: Page<Equip>,
+  spells: Page<Spell>,
+  roles: Page<Role> = {},
+): Catalog {
   const icons = new Map<string, string | null>();
   const items: string[] = [];
+  const ids = new Map<number, string>();
   for (const { data } of equipment.data?.records ?? []) {
     const name = data.equipname?.trim();
     if (!name || removed(name)) continue;
     icons.set(name, data.equipicon || null);
     items.push(name);
+    if (typeof data.equipid === 'number') ids.set(data.equipid, name);
+  }
+  // Emblems are listed with the roles; "All" is not one you pick.
+  for (const { data } of roles.data?.records ?? []) {
+    const name = data.emblem_title?.trim();
+    if (name && name !== 'All') icons.set(name, data.emblem_icon || null);
   }
   for (const { data } of spells.data?.records ?? []) {
     const name = data.__data?.skillname?.trim();
     if (name) icons.set(name, data.__data.skillicon || null);
   }
-  return { icons, items };
+  return { icons, items, ids };
 }
 
 // Gemini writes names its own way: different case, a curly apostrophe, a
@@ -84,7 +101,8 @@ export const loadCatalog = (now = Date.now()) =>
       Promise.all([
         get<Page<Equip>>('/academy/equipment?size=500'),
         get<Page<Spell>>('/academy/spells?size=50'),
-      ]).then(([equipment, spells]) => catalogFrom(equipment, spells)),
+        get<Page<Role>>('/academy/roles'),
+      ]).then(([equipment, spells, roles]) => catalogFrom(equipment, spells, roles)),
     now,
   );
 
@@ -114,15 +132,16 @@ export const loadPortraits = (now = Date.now()) =>
 export async function loadGains(
   hero: string,
   kind: 'counters' | 'teammates',
+  rank: Rank = 'all',
   now = Date.now(),
 ): Promise<Map<string, number>> {
   const names = await loadHeroIds(now);
   const id = [...names].find(([, name]) => squash(name) === squash(hero))?.[0];
   if (id === undefined) throw new Error(`arena does not know ${hero}`);
   return remember(
-    `${kind}:${id}`,
+    `${kind}:${id}:${rank}`,
     () =>
-      get<Page<Relation>>(`/academy/heroes/${id}/${kind}`).then(
+      get<Page<Relation>>(`/academy/heroes/${id}/${kind}?rank=${rank}`).then(
         (page) =>
           new Map(
             (page.data?.records?.[0]?.data.sub_hero ?? []).flatMap((s) => {
@@ -130,6 +149,50 @@ export async function loadGains(
               return name ? [[name, s.increase_win_rate] as const] : [];
             }),
           ),
+      ),
+    now,
+  );
+}
+
+type Talent = { data: { giftid?: number; emblemskill?: { skillname?: string } } };
+
+// Talent names by the id builds list them with.
+const loadTalents = (now: number) =>
+  remember(
+    'talents',
+    () =>
+      get<Page<Talent>>('/academy/emblems?size=200').then(
+        (page) =>
+          new Map(
+            (page.data?.records ?? []).flatMap(({ data }) =>
+              typeof data.giftid === 'number' && data.emblemskill?.skillname
+                ? [[data.giftid, data.emblemskill.skillname] as const]
+                : [],
+            ),
+          ),
+      ),
+    now,
+  );
+
+// The most played builds for a hero in a lane, best win rate first.
+export async function loadBuilds(
+  hero: string,
+  lane: Lane,
+  rank: Rank = 'all',
+  now = Date.now(),
+): Promise<Build[]> {
+  const [names, catalog, talents] = await Promise.all([
+    loadHeroIds(now),
+    loadCatalog(now),
+    loadTalents(now),
+  ]);
+  const id = [...names].find(([, name]) => squash(name) === squash(hero))?.[0];
+  if (id === undefined) throw new Error(`arena does not know ${hero}`);
+  return remember(
+    `builds:${id}:${lane}:${rank}`,
+    () =>
+      get<BuildPage>(`/academy/heroes/${id}/builds?lane=${lane}&rank=${rank}`).then((page) =>
+        buildsFrom(page, catalog.ids, talents),
       ),
     now,
   );

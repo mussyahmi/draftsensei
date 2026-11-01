@@ -6,6 +6,26 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.3.0] - 2026-11-01
+
+### Added
+- Builds start from the Academy's top builds for your hero and lane, with their
+  win rates, and now name the emblem and its talents, with the emblem's icon.
+- Bans (optional): type them in and suggestions never include a banned hero.
+- My rank, set once in My heroes: counters and builds come from players at
+  your rank instead of all ranks mixed.
+
+### Changed
+- Clearer spacing: labels sit with their boxes, and sections, sides and lanes
+  are spaced apart so it is easy to see what belongs together.
+- Suggestions weigh the enemy in your own lane double, since that is who you
+  fight most.
+- The three tips after a build are labelled: Help first, Ult on, Win condition.
+
+### Fixed
+- The battle spell gets its icon even when Gemini leaves out the "Battle spell:"
+  label.
+
 ## [0.2.0] - 2026-11-01
 
 ### Added

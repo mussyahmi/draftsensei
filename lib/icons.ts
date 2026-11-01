@@ -15,8 +15,15 @@ const itemLine = (line: string) => line.match(/^\s*(?:[*-]\s+)?\d+[.)]\s+(.+)$/)
 export function itemOf(line: string): string | null {
   const spell = line.match(/battle spell\W*?:\**\s*(.+)$/i);
   if (spell) return nameOf(spell[1]);
+  const emblem = line.match(/emblem\W*?:\**\s*(.+)$/i);
+  if (emblem) return nameOf(emblem[1]);
   const item = itemLine(line);
-  return item ? nameOf(item[1]) : null;
+  if (item) return nameOf(item[1]);
+  // Gemini sometimes writes the spell as a bare bullet, "- Flicker". Any
+  // bulleted line is worth a lookup; one that names no item or spell, like an
+  // advice line, simply finds no icon.
+  const bullet = line.match(/^\s*[*-]\s+(.+)$/);
+  return bullet ? nameOf(bullet[1]) : null;
 }
 
 // Which hero a line of a pick answer is about: one whose name the line opens

@@ -9,6 +9,8 @@ const draft: Draft = {
     team: [{ hero: 'Lukas', lane: 'jungle' }],
   },
   myHero: '',
+  bans: [],
+  rank: 'all',
 };
 
 test('a new pool has an empty list for every lane', () => {

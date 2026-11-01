@@ -1,5 +1,5 @@
 import { test, expect, vi, afterEach } from 'vitest';
-import { catalogFrom, iconFor, loadCatalog, forgetArena } from '../lib/arena';
+import { catalogFrom, iconFor, loadCatalog, loadGains, forgetArena } from '../lib/arena';
 
 const equipment = {
   data: {
@@ -13,11 +13,14 @@ const equipment = {
     ],
   },
 };
+const roles = {
+  data: { records: [{ data: { emblem_title: 'Support', emblem_icon: 'https://img/support.png' } }] },
+};
 const spells = {
   data: { records: [{ data: { __data: { skillname: 'Flicker', skillicon: 'https://img/flicker.png' } } }] },
 };
 
-const catalog = catalogFrom(equipment, spells);
+const catalog = catalogFrom(equipment, spells, roles);
 
 test('the item list leaves out items the game has removed', () => {
   expect(catalog.items).toEqual([
@@ -27,6 +30,10 @@ test('the item list leaves out items the game has removed', () => {
     'Tough Boots',
     'Blank Icon',
   ]);
+});
+
+test('emblems get their icons too', () => {
+  expect(iconFor(catalog, 'support')).toBe('https://img/support.png');
 });
 
 test('icons match however Gemini cases or punctuates the name', () => {
@@ -53,14 +60,17 @@ afterEach(() => {
 
 const serve = () =>
   vi.fn(async (url: string) =>
-    new Response(JSON.stringify(url.includes('/spells') ? spells : equipment), { status: 200 }));
+    new Response(
+      JSON.stringify(url.includes('/spells') ? spells : url.includes('/roles') ? roles : equipment),
+      { status: 200 },
+    ));
 
 test('the catalog is fetched once and reused across asks', async () => {
   const fetch = serve();
   vi.stubGlobal('fetch', fetch);
   await loadCatalog(0);
   await loadCatalog(60_000);
-  expect(fetch).toHaveBeenCalledTimes(2); // equipment and spells, once each
+  expect(fetch).toHaveBeenCalledTimes(3); // equipment, spells and emblems, once each
 });
 
 test('a failed fetch is not kept, so the next ask tries again', async () => {
@@ -68,4 +78,17 @@ test('a failed fetch is not kept, so the next ask tries again', async () => {
   await expect(loadCatalog(0)).rejects.toThrow();
   vi.stubGlobal('fetch', serve());
   await expect(loadCatalog(1)).resolves.toMatchObject({ items: expect.any(Array) });
+});
+
+test('match stats are asked for at my rank', async () => {
+  const seen: string[] = [];
+  vi.stubGlobal('fetch', async (url: string) => {
+    seen.push(url);
+    const body = url.includes('/heroes?size')
+      ? { data: { records: [{ data: { hero_id: 27, hero: { data: { name: 'Sun' } } } }] } }
+      : { data: { records: [{ data: { sub_hero: [] } }] } };
+    return new Response(JSON.stringify(body));
+  });
+  await loadGains('Sun', 'counters', 'glory', 0);
+  expect(seen).toContain('https://arena.rone.dev/api/academy/heroes/27/counters?rank=glory');
 });
