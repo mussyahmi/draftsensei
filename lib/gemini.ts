@@ -25,7 +25,11 @@ export const extractText = (payload: GeminiPayload) =>
 export const endpoint = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-// Gemini answers in a second or two most days, but under load it has taken
-// close to a minute, which is useless mid-draft and long enough for a proxy
-// in front of us to give up.
-export const MODEL_TIMEOUT_MS = 15_000;
+// Gemini answers in a second or two most days, but under load even a short
+// answer has taken over 30 seconds. Wait that long rather than fail, but stay
+// inside the 60 second proxy in front of us, search attempt included.
+export const MODEL_TIMEOUT_MS = 45_000;
+
+// The search attempt is a bonus: free keys are refused it, so it must not eat
+// the time the plain ask needs.
+export const SEARCH_TIMEOUT_MS = 8_000;

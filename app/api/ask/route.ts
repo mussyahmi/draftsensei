@@ -5,6 +5,7 @@ import {
   extractText,
   requestBody,
   MODEL_TIMEOUT_MS,
+  SEARCH_TIMEOUT_MS,
   type GeminiPayload,
 } from '@/lib/gemini';
 import { loadBuilds, loadCatalog } from '@/lib/arena';
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify(requestBody(asking, withSearch)),
-      signal: AbortSignal.timeout(timeout),
+      signal: AbortSignal.timeout(withSearch ? Math.min(timeout, SEARCH_TIMEOUT_MS) : timeout),
     });
 
   // A build tries search first. Free keys have no search quota on Gemini 3

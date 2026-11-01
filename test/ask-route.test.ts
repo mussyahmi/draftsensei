@@ -1,6 +1,6 @@
 import { test, expect, vi, afterEach } from 'vitest';
 import { POST } from '../app/api/ask/route';
-import { MODEL_TIMEOUT_MS } from '../lib/gemini';
+import { MODEL_TIMEOUT_MS, SEARCH_TIMEOUT_MS } from '../lib/gemini';
 import { forgetArena } from '../lib/arena';
 import { countAsk } from '../lib/quota-store';
 
@@ -289,5 +289,5 @@ test('a plain ask never searches', async () => {
 });
 
 test('the timeout leaves room for a search and a plain ask inside a 60s proxy', () => {
-  expect(MODEL_TIMEOUT_MS * 2).toBeLessThan(60_000);
+  expect(SEARCH_TIMEOUT_MS + MODEL_TIMEOUT_MS).toBeLessThan(60_000);
 });

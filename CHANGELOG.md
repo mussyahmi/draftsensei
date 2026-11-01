@@ -6,6 +6,11 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.3.1] - 2026-11-02
+
+### Fixed
+- When Gemini is slow, suggestions wait up to 45 seconds for an answer instead
+  of giving up after 15 with "took too long to answer".
 ## [0.3.0] - 2026-11-01
 
 ### Added
