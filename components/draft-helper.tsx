@@ -41,6 +41,9 @@ import { LanePicker } from '@/components/lane-picker';
 import { PickList } from '@/components/pick-list';
 import { PoolDialog } from '@/components/pool-dialog';
 import { BanList } from '@/components/ban-list';
+import type { MetaHero } from '@/lib/bans';
+import { PickSuggestions } from '@/components/pick-suggestions';
+import type { Ranked } from '@/lib/matchups';
 import { ChangelogDialog } from '@/components/changelog-dialog';
 import type { Release } from '@/lib/changelog';
 import { Button } from '@/components/ui/button';
@@ -93,6 +96,11 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   // Every hero's portrait by name. Empty until loaded, or if the art source
   // is down, in which case names show alone.
   const [portraits, setPortraits] = useState<Record<string, string | null>>({});
+  // Every hero strongest first at my rank, for ban suggestions. Empty until
+  // loaded, or if the data source is down, in which case none are shown.
+  const [meta, setMeta] = useState<MetaHero[]>([]);
+  // The best heroes for my lane as the board stands, from match data alone.
+  const [instant, setInstant] = useState<Ranked[]>([]);
 
   const [account, setAccount] = useState<Account | null>(null);
   // Until the cloud copy has been compared with this device's, saving back
@@ -135,6 +143,23 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         /* names show without portraits */
       });
   }, []);
+
+  // Strongest heroes at my rank; asked again only when the rank changes.
+  useEffect(() => {
+    if (!hydrated) return;
+    let current = true;
+    fetch(`/api/bans?rank=${draft.rank}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((m: MetaHero[]) => {
+        if (current) setMeta(m);
+      })
+      .catch(() => {
+        /* no ban suggestions; banning by name still works */
+      });
+    return () => {
+      current = false;
+    };
+  }, [hydrated, draft.rank]);
 
   // What was last written, and when. Refs, because these are bookkeeping for
   // the save effects rather than anything the screen renders — and they are
@@ -182,6 +207,33 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     }),
     [draft, pool],
   );
+
+  // Ranked again whenever the board changes. A short wait lets a burst of
+  // edits settle into one request, and a late answer for an older board is
+  // dropped.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!picks.enemy.length && !picks.team.length) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      fetch('/api/picks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ picks }),
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((ranked: Ranked[]) => {
+          if (current) setInstant(ranked);
+        })
+        .catch(() => {
+          /* no instant picks; Suggest heroes still works */
+        });
+    }, 250);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [hydrated, picks]);
 
   // What goes along with the prompt: the board as names for hero picks, my
   // hero and lane for a build, so the server can look up real stats.
@@ -410,6 +462,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             bans={draft.bans}
             unavailable={taken}
             portraits={portraits}
+            meta={meta}
             onChange={(bans) => setDraft((d) => ({ ...d, bans }))}
           />
           <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2">
@@ -453,6 +506,15 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             Type a few letters, Enter to add. The lane is filled in for you. Tap
             another lane to change it.
           </p>
+
+          {!draft.myHero && (
+            <PickSuggestions
+              // An emptied board keeps no stale picks from before.
+              ranked={picks.enemy.length || picks.team.length ? instant : []}
+              portraits={portraits}
+              onPick={(hero) => setDraft((d) => ({ ...d, myHero: hero }))}
+            />
+          )}
 
           <AskPanel
             label="Suggest heroes"

@@ -6,6 +6,19 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.4.0] - 2026-11-02
+
+### Added
+- Ban suggestions: the 5 strongest heroes this week at your rank, by win rate
+  and how often they are already banned. Tap one to ban it. No asking needed,
+  so it shows instantly and does not use the daily asks.
+- Instant picks: the 3 best heroes for your lane, updated as each pick goes
+  in, each with how much more often it wins against the enemy it counters
+  best. Tap one to make it your hero. No asking needed.
+
+### Changed
+- The lane menu closes once you choose, and names lanes as the chips do.
+
 ## [0.3.1] - 2026-11-02
 
 ### Fixed

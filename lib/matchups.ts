@@ -133,8 +133,13 @@ const loaded = async (heroes: string[], kind: 'counters' | 'teammates', rank: Ra
     r.status === 'fulfilled' ? [[heroes[i], r.value] as const] : [],
   );
 
-export async function matchupData(picks: Picks): Promise<string[]> {
-  if (!picks.enemy.length && !picks.team.length) return [];
+// The heroes for my lane that do best on this board, strongest first, and
+// whether any team stats loaded to back a "with my team" number.
+export async function rankedFor(
+  picks: Picks,
+  count = SHOWN,
+): Promise<{ ranked: Ranked[]; withTeam: boolean }> {
+  if (!picks.enemy.length && !picks.team.length) return { ranked: [], withTeam: false };
   const [against, alongside] = await Promise.all([
     loaded(picks.enemy, 'counters', picks.rank ?? 'all'),
     loaded(picks.team, 'teammates', picks.rank ?? 'all'),
@@ -151,6 +156,22 @@ export async function matchupData(picks: Picks): Promise<string[]> {
     new Map(against),
     alongside.map(([, gains]) => gains),
     picks.opponent,
-  ).slice(0, SHOWN);
-  return matchupLines(ranked, alongside.length > 0);
+  ).slice(0, count);
+  return { ranked, withTeam: alongside.length > 0 };
+}
+
+export async function matchupData(picks: Picks): Promise<string[]> {
+  const { ranked, withTeam } = await rankedFor(picks);
+  return matchupLines(ranked, withTeam);
+}
+
+// The one line on an instant pick, as how much more often it wins: its
+// biggest win into an enemy, the lane opponent on a tie since that is the
+// fight it takes most; failing any, how it fits my team.
+export function pickReason(r: Ranked): string | null {
+  const lane = r.opponent && r.opponent.gain > 0 ? r.opponent : null;
+  const into = lane && (!r.best || lane.gain >= r.best.gain) ? lane : r.best;
+  if (into) return `${percent(into.gain)} win vs ${into.enemy}`;
+  if (r.alongside > 0) return `${percent(r.alongside)} win with team`;
+  return null;
 }

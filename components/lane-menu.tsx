@@ -25,8 +25,14 @@ export function LaneMenu({ value, onChange }: { value: Lane; onChange: (lane: La
       <DropdownMenuContent align="end" className="min-w-36">
         <DropdownMenuRadioGroup value={value} onValueChange={(lane) => onChange(lane as Lane)}>
           {LANES.map((lane) => (
-            <DropdownMenuRadioItem key={lane.key} value={lane.key} className="min-h-10 sm:min-h-8">
-              {laneLabel(lane.key)}
+            // Closes on choosing, and says each lane just as the chip will.
+            <DropdownMenuRadioItem
+              key={lane.key}
+              value={lane.key}
+              closeOnClick
+              className="min-h-10 font-display text-sm uppercase tracking-wide sm:min-h-8"
+            >
+              {lane.key}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

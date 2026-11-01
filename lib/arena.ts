@@ -1,3 +1,4 @@
+import { metaFrom, type MetaHero, type RankPage } from './bans';
 import { buildsFrom, type Build, type BuildPage } from './builds';
 import type { Lane, Rank } from './draft';
 
@@ -197,3 +198,15 @@ export async function loadBuilds(
     now,
   );
 }
+
+// Every hero's win and ban rate over the last week at this rank, strongest
+// first, for ban suggestions.
+export const loadMeta = (rank: Rank = 'all', now = Date.now()): Promise<MetaHero[]> =>
+  remember(
+    `meta:${rank}`,
+    () =>
+      get<RankPage>(`/heroes/rank?days=7&rank=${rank}&sort_field=win_rate&sort_order=desc&size=200`).then(
+        metaFrom,
+      ),
+    now,
+  );

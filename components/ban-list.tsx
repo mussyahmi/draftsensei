@@ -3,18 +3,22 @@
 import { X } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
+import { banReason, suggestBans, type MetaHero } from '@/lib/bans';
 
 type Props = {
   bans: string[];
   // Heroes already picked or banned, which cannot be banned again.
   unavailable: string[];
   portraits: Record<string, string | null>;
+  // Every hero strongest first at the player's rank; empty if not loaded.
+  meta: MetaHero[];
   onChange: (bans: string[]) => void;
 };
 
 // Both teams' bans in one list: entering them is optional, and when it is
 // done, suggestions skip them. Ten at most, five a side.
-export function BanList({ bans, unavailable, portraits, onChange }: Props) {
+export function BanList({ bans, unavailable, portraits, meta, onChange }: Props) {
+  const suggested = bans.length < 10 ? suggestBans(meta, unavailable) : [];
   return (
     <div className="space-y-2">
       <h3 className="font-display text-sm uppercase tracking-widest text-muted-foreground">
@@ -52,6 +56,31 @@ export function BanList({ bans, unavailable, portraits, onChange }: Props) {
               </button>
             </span>
           ))}
+        </div>
+      )}
+      {/* No asking needed: the strongest heroes this week, one tap each. */}
+      {suggested.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <p className="text-xs text-muted-foreground">Strongest this week, tap to ban</p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggested.map((m) => (
+              <button
+                key={m.hero}
+                type="button"
+                aria-label={`Ban ${m.hero}`}
+                onClick={() => onChange([...bans, m.hero])}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-dashed border-border py-0.5 ps-0.5 pe-3 text-sm hover:border-destructive hover:bg-secondary"
+              >
+                {portraits[m.hero] ? (
+                  <GameImage src={portraits[m.hero]!} className="size-7 rounded-full" />
+                ) : (
+                  <span className="ps-2" />
+                )}
+                <span>{m.hero}</span>
+                <span className="text-xs text-muted-foreground">{banReason(m)}</span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
