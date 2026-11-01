@@ -148,8 +148,13 @@ working, note user-facing changes under **Unreleased** in
    start a fresh empty **Unreleased** above it.
 4. `npm test`. It fails if the changelog's latest version does not match
    `package.json`.
-5. Commit, then deploy. The header shows the new version once it is live,
-   and clicking it opens the changelog for players. Unreleased is never shown.
+5. Commit and push to `main`. App Hosting rolls it out on its own.
+6. Once the rollout is done, run `firebase deploy --only hosting`. The
+   draftsensei.web.app address goes through Firebase Hosting's CDN, which keeps
+   the page for up to a year and is only cleared by a Hosting deploy, so
+   without this it keeps serving the old version.
+7. Check the header on draftsensei.web.app shows the new version. Clicking it
+   opens the changelog for players; Unreleased is never shown.
 
 ## `legacy/`
 
