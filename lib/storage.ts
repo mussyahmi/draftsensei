@@ -1,9 +1,7 @@
 import { newDraft, newPool, type Draft, type Pool } from './draft';
-import type { Usage } from './usage';
 
 const DRAFT_KEY = 'ml-draft-helper';
 const POOL_KEY = 'ml-draft-helper-pool';
-const USAGE_KEY = 'ml-draft-helper-usage';
 
 // Private browsing throws on both read and write. The app still works there; it
 // just forgets everything on reload.
@@ -23,17 +21,16 @@ const write = (key: string, value: unknown) => {
   }
 };
 
-export type Saved = { step: 1 | 2; draft: Draft; updatedAt: number };
+export type Saved = { draft: Draft; updatedAt: number };
 
 export const loadDraft = (): Saved => {
   const saved = read<Saved>(DRAFT_KEY);
   return saved?.draft?.picks
     ? {
-        step: saved.step === 2 ? 2 : 1,
         draft: { ...newDraft(), ...saved.draft },
         updatedAt: saved.updatedAt ?? 0,
       }
-    : { step: 1, draft: newDraft(), updatedAt: 0 };
+    : { draft: newDraft(), updatedAt: 0 };
 };
 
 export const saveDraft = (saved: Saved) => write(DRAFT_KEY, saved);
@@ -41,7 +38,3 @@ export const saveDraft = (saved: Saved) => write(DRAFT_KEY, saved);
 export const loadPool = (): Pool => ({ ...newPool(), ...(read<Pool>(POOL_KEY) ?? {}) });
 
 export const savePool = (pool: Pool) => write(POOL_KEY, pool);
-
-export const loadUsage = () => read<Usage>(USAGE_KEY);
-
-export const saveUsage = (usage: Usage) => write(USAGE_KEY, usage);

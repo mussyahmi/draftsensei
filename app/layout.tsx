@@ -15,7 +15,7 @@ const display = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: 'DraftSensei — Mobile Legends draft helper',
+  title: 'DraftSensei: Mobile Legends draft helper',
   description: 'Type the picks, get the counter-pick and the build, mid-draft.',
 };
 

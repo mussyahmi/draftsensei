@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { pickPrompt, buildPrompt } from '../lib/draft';
+import { pickPrompt, buildPrompt, newPool } from '../lib/draft';
 import type { Draft } from '../lib/draft';
 
 const draft: Draft = {
@@ -20,7 +20,18 @@ test('pick prompt asks for my lane and lists picks with their lanes', () => {
     'my team pick: lukas (jungling) marcel (roaming)',
     '',
     'answer with hero names, each with a reason of 6 words max',
+    'do not suggest a hero already picked by either team',
   ].join('\n'));
+});
+
+test('pick prompt leaves out heroes the enemy or my team already took from my pool', () => {
+  const pool = { ...newPool(), mid: ['Eudora', 'Lukas', 'Kagura', 'Lylia'] };
+  expect(pickPrompt(draft, pool)).toMatch(/only suggest from my heroes: kagura, lylia$/);
+});
+
+test('pick prompt drops the pool limit when every hero in it is taken', () => {
+  const pool = { ...newPool(), mid: ['Eudora', 'Lukas'] };
+  expect(pickPrompt(draft, pool)).not.toMatch(/only suggest from my heroes/);
 });
 
 test('pick prompt says none for a side with no picks yet', () => {
@@ -38,12 +49,27 @@ test('build prompt names my hero and lane and asks for the gameplay guide', () =
     '',
     'answer short, no paragraphs:',
     '- battle spell',
-    '- 6 items in build order, names only, each marked core or situational',
-    '- mark as many core as this hero really needs, do not force 3 and 3',
-    '- order by when to buy, so a situational item can come before a core one',
+    '- 6 items, numbered 1 to 6, names only, no other notes',
+    '- order them by when to buy',
     '',
     'then 3 short lines: which lane to help first, who to use my ult on, our win condition',
   ].join('\n'));
+});
+
+test('build prompt asks which roam blessing goes on the boots for a roamer', () => {
+  expect(buildPrompt({ ...draft, myLane: 'roam' })).toMatch(
+    /\n- boots first, and name which roam blessing to put on them\n/,
+  );
+});
+
+test('build prompt asks which jungle blessing goes on the boots for a jungler', () => {
+  expect(buildPrompt({ ...draft, myLane: 'jungle' })).toMatch(
+    /\n- boots first, and name which jungle blessing to put on them\n/,
+  );
+});
+
+test('build prompt asks for no blessing in a lane that does not use one', () => {
+  expect(buildPrompt(draft)).not.toMatch(/blessing/);
 });
 
 test('build prompt leaves a blank for the hero until one is chosen', () => {

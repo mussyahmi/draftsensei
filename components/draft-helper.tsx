@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LANES,
   buildPrompt,
   laneLabel,
   newDraft,
   newPool,
   pickPrompt,
+  poolFor,
   takenHeroes,
   type Draft,
   type Lane,
@@ -15,14 +15,13 @@ import {
   type Side,
 } from '@/lib/draft';
 import { HERO_LANES } from '@/lib/heroes';
-import { countToday, recordAsk, today, type Usage } from '@/lib/usage';
+import type { Picks } from '@/lib/matchups';
+import { DAILY_LIMIT } from '@/lib/quota';
 import {
   loadDraft,
   loadPool,
-  loadUsage,
   saveDraft,
   savePool,
-  saveUsage,
 } from '@/lib/storage';
 import {
   loadRemote,
@@ -35,16 +34,19 @@ import {
 import { firebaseReady } from '@/lib/firebase';
 import { newer } from '@/lib/sync';
 import { AccountButton } from '@/components/account-button';
-import { AnswerBar, type Answer } from '@/components/answer-bar';
+import { AskPanel, type Answer } from '@/components/ask-panel';
+import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
 import { LanePicker } from '@/components/lane-picker';
 import { PickList } from '@/components/pick-list';
 import { PoolDialog } from '@/components/pool-dialog';
+import { ChangelogDialog } from '@/components/changelog-dialog';
+import type { Release } from '@/lib/changelog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-type Step = 1 | 2;
-type ActiveChip = { side: Side; index: number } | null;
+// The page asks twice: which hero to pick, then how to build them.
+type Phase = 'pick' | 'build';
 
 // Firebase puts the useful part in `code`, e.g. permission-denied. Saying
 // which one it is turns a dead end into something you can act on.
@@ -54,27 +56,41 @@ const reason = (e: unknown) =>
 
 // One string standing for the whole board, so a save can tell a real edit
 // from a re-render.
-const contentOf = (step: Step, draft: Draft, pool: Pool) =>
-  JSON.stringify({ step, draft, pool });
+const contentOf = (draft: Draft, pool: Pool) => JSON.stringify({ draft, pool });
+
+// Sets one phase's slot in a per-phase record, leaving the other alone.
+const forPhase =
+  <T,>(phase: Phase, value: T) =>
+  (r: Record<Phase, T>) => ({ ...r, [phase]: value });
+
+function PhaseTitle({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <h2 className="font-display text-base uppercase tracking-wide">
+      <span className="text-primary">{n}</span> {children}
+    </h2>
+  );
+}
 
 const SIDES: { key: Side; label: string }[] = [
   { key: 'team', label: 'My team' },
   { key: 'enemy', label: 'Enemy' },
 ];
 
-export function DraftHelper() {
-  const [step, setStep] = useState<Step>(1);
+export function DraftHelper({ releases }: { releases: Release[] }) {
   const [draft, setDraft] = useState<Draft>(newDraft);
   const [pool, setPool] = useState<Pool>(newPool);
-  const [activeChip, setActiveChip] = useState<ActiveChip>(null);
   const [poolOpen, setPoolOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
 
-  const [answer, setAnswer] = useState<Answer | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [usage, setUsage] = useState<Usage | null>(null);
-  // Read once on mount: today's date is not knowable during a prerender.
-  const [day, setDay] = useState('');
+  const [answers, setAnswers] = useState<Record<Phase, Answer | null>>({ pick: null, build: null });
+  const [loading, setLoading] = useState<Record<Phase, boolean>>({ pick: false, build: false });
+  const [errors, setErrors] = useState<Record<Phase, string | null>>({ pick: null, build: null });
+  // Today's asks across everyone, out of the one shared free allowance.
+  // Null until the server says, or if it cannot count.
+  const [used, setUsed] = useState<number | null>(null);
+  // Every hero's portrait by name. Empty until loaded, or if the art source
+  // is down, in which case names show alone.
+  const [portraits, setPortraits] = useState<Record<string, string | null>>({});
 
   const [account, setAccount] = useState<Account | null>(null);
   // Until the cloud copy has been compared with this device's, saving back
@@ -93,13 +109,29 @@ export function DraftHelper() {
   useEffect(() => {
     const saved = loadDraft();
     /* eslint-disable react-hooks/set-state-in-effect */
-    setStep(saved.step);
     setDraft(saved.draft);
     setPool(loadPool());
-    setUsage(loadUsage());
-    setDay(today());
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  // Everyone shares one daily allowance, so show how much of it is gone. Asks
+  // keep it current after this.
+  useEffect(() => {
+    fetch('/api/usage')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u: { used: number | null } | null) => {
+        if (typeof u?.used === 'number') setUsed(u.used);
+      })
+      .catch(() => {
+        /* no count shown; asking still works */
+      });
+    fetch('/api/portraits')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then(setPortraits)
+      .catch(() => {
+        /* names show without portraits */
+      });
   }, []);
 
   // What was last written, and when. Refs, because these are bookkeeping for
@@ -113,7 +145,7 @@ export function DraftHelper() {
   // on a second device overwrote good data with an empty draft.
   useEffect(() => {
     if (!hydrated) return;
-    const content = contentOf(step, draft, pool);
+    const content = contentOf(draft, pool);
 
     if (localMark.current === null) {
       // First pass after hydration: adopt the stored time, write nothing.
@@ -124,64 +156,76 @@ export function DraftHelper() {
 
     const at = Date.now();
     localMark.current = { content, at };
-    saveDraft({ step, draft, updatedAt: at });
+    saveDraft({ draft, updatedAt: at });
     savePool(pool);
-  }, [hydrated, step, draft, pool]);
+  }, [hydrated, draft, pool]);
 
-  const prompt = step === 1 ? pickPrompt(draft, pool) : buildPrompt(draft);
+  const prompts: Record<Phase, string> = {
+    pick: pickPrompt(draft, pool),
+    build: buildPrompt(draft),
+  };
+  // A hero pick ask carries the board as names, so the server can look up
+  // real counters for it. A build ask needs none: the server checks it
+  // against the current shop instead.
+  const picks = useMemo<Picks>(
+    () => ({
+      lane: draft.myLane,
+      enemy: draft.picks.enemy.map((p) => p.hero),
+      team: draft.picks.team.map((p) => p.hero),
+      pool: poolFor(pool, draft.myLane),
+    }),
+    [draft, pool],
+  );
 
-  const ask = useCallback(async (asking: string) => {
-    setLoading(true);
-    setError(null);
+  const ask = useCallback(async (phase: Phase, asking: string, board?: Picks) => {
+    const fail = (message: string) => setErrors(forPhase<string | null>(phase, message));
+    setLoading(forPhase(phase, true));
+    setErrors(forPhase<string | null>(phase, null));
     try {
       const response = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: asking }),
+        body: JSON.stringify({ prompt: asking, build: phase === 'build', picks: board }),
       });
       // A crash upstream answers with an HTML error page, not JSON, so read
       // the body defensively rather than reporting it as a dead network.
       const body = await response.text();
-      let data: { text?: string; model?: string; error?: string } = {};
+      let data: {
+        text?: string;
+        model?: string;
+        searched?: boolean;
+        used?: number | null;
+        error?: string;
+      } = {};
       try {
         data = JSON.parse(body);
       } catch {
-        setError(`Server error (${response.status}). Check the dev server log.`);
+        fail(`Server error (${response.status}). Check the dev server log.`);
         return;
       }
       if (!response.ok) {
-        setError(data.error ?? 'Gemini did not answer.');
+        fail(data.error ?? 'Gemini did not answer.');
       } else {
-        setAnswer({
-          text: data.text ?? '',
-          prompt: asking,
-          model: data.model ?? '',
-        });
-        const now = today();
-        setDay(now);
-        setUsage((u) => {
-          const next = recordAsk(u, now);
-          saveUsage(next);
-          return next;
-        });
+        setAnswers(
+          forPhase<Answer | null>(phase, {
+            text: data.text ?? '',
+            prompt: asking,
+            model: data.model ?? '',
+            searched: data.searched ?? false,
+            build: phase === 'build',
+          }),
+        );
+        if (typeof data.used === 'number') setUsed(data.used);
       }
     } catch {
-      setError('No connection. Use Show prompt and paste it into Gemini.');
+      fail('No connection. Use Show prompt and paste it into Gemini.');
     } finally {
-      setLoading(false);
+      setLoading(forPhase(phase, false));
     }
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        if (!loading) ask(prompt);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [ask, prompt, loading]);
+  const askPicks = () => ask('pick', prompts.pick, picks);
+  const askBuild = () => ask('build', prompts.build);
 
   /* ---------- the signed-in account ---------- */
 
@@ -202,15 +246,14 @@ export function DraftHelper() {
         if (dropped) return;
         const saved = loadDraft();
         const winner = newer(
-          { step: saved.step, draft: saved.draft, pool: loadPool(), updatedAt: saved.updatedAt },
+          { draft: saved.draft, pool: loadPool(), updatedAt: saved.updatedAt },
           remote,
         );
         if (winner) {
-          setStep(winner.step);
           setDraft(winner.draft);
           setPool(winner.pool);
           // Both sides now hold the winner, so neither save should fire for it.
-          const content = contentOf(winner.step, winner.draft, winner.pool);
+          const content = contentOf(winner.draft, winner.pool);
           localMark.current = { content, at: winner.updatedAt };
           cloudMark.current = content;
         }
@@ -231,14 +274,13 @@ export function DraftHelper() {
   // Push changes up, a moment after you stop typing.
   useEffect(() => {
     if (!hydrated || !uid || !reconciled) return;
-    const content = contentOf(step, draft, pool);
+    const content = contentOf(draft, pool);
     if (cloudMark.current === content) return;
 
     const id = setTimeout(() => {
       cloudMark.current = content;
       setSyncing(true);
       saveRemote(uid, {
-        step,
         draft,
         pool,
         updatedAt: localMark.current?.at ?? Date.now(),
@@ -248,7 +290,7 @@ export function DraftHelper() {
         .finally(() => setSyncing(false));
     }, 1200);
     return () => clearTimeout(id);
-  }, [hydrated, uid, reconciled, step, draft, pool]);
+  }, [hydrated, uid, reconciled, draft, pool]);
 
   const signIn = () => {
     signInWithGoogle().catch(() => setSyncProblem('Sign-in did not complete.'));
@@ -267,7 +309,6 @@ export function DraftHelper() {
         [side]: [...d.picks[side], { hero, lane: HERO_LANES[hero] ?? 'mid' }],
       },
     }));
-    setActiveChip({ side, index: draft.picks[side].length });
   };
 
   const setLane = (side: Side, index: number, lane: Lane) => {
@@ -278,7 +319,6 @@ export function DraftHelper() {
         [side]: d.picks[side].map((p, i) => (i === index ? { ...p, lane } : p)),
       },
     }));
-    setActiveChip(null);
   };
 
   const removePick = (side: Side, index: number) => {
@@ -286,42 +326,51 @@ export function DraftHelper() {
       ...d,
       picks: { ...d.picks, [side]: d.picks[side].filter((_, i) => i !== index) },
     }));
-    setActiveChip(null);
-  };
-
-  // 1–5 re-lanes the pick just added, without leaving the keyboard.
-  const laneShortcut = (key: string) => {
-    if (!activeChip || !/^[1-5]$/.test(key)) return false;
-    setLane(activeChip.side, activeChip.index, LANES[Number(key) - 1].key);
-    return true;
   };
 
   const resetDraft = () => {
     setDraft((d) => ({ ...newDraft(), myLane: d.myLane }));
-    setStep(1);
-    setActiveChip(null);
-    setAnswer(null);
-    setError(null);
+    setAnswers({ pick: null, build: null });
+    setErrors({ pick: null, build: null });
   };
 
   const taken = takenHeroes(draft);
+  // My hero counts toward my team, once, even if I also typed them in there.
+  const counts: Record<Side, number> = {
+    team: new Set([...draft.picks.team.map((p) => p.hero), ...(draft.myHero ? [draft.myHero] : [])]).size,
+    enemy: draft.picks.enemy.length,
+  };
 
   return (
     <>
       <header className="border-b border-border bg-card/60">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <h1 className="font-display text-xl uppercase tracking-wider">
-            DraftSensei
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-baseline gap-1.5">
+            <h1 className="font-display text-xl uppercase tracking-wider">DraftSensei</h1>
+            <button
+              type="button"
+              onClick={() => setChangelogOpen(true)}
+              title="What's new"
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              v{process.env.NEXT_PUBLIC_APP_VERSION}
+            </button>
+          </div>
+          {/* On a phone the lane is the control touched most, so it spans the
+              width with thumb-sized chips. */}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
               I&apos;m playing
             </span>
             <LanePicker
               value={draft.myLane}
               onChange={(lane) => setDraft((d) => ({ ...d, myLane: lane }))}
+              className="flex-1 sm:flex-none"
             />
           </div>
+          <span className="text-xs text-muted-foreground">
+            {used !== null && `${used} / ${DAILY_LIMIT} asks today`}
+          </span>
           <div className="ms-auto flex items-center gap-1">
             {firebaseReady && (
               <AccountButton
@@ -342,100 +391,103 @@ export function DraftHelper() {
         </div>
       </header>
 
-      <nav className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-5xl gap-1 px-4 py-2">
-          {([1, 2] as Step[]).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => {
-                setStep(n);
-                setActiveChip(null);
-              }}
-              aria-current={step === n}
-              className={cn(
-                'rounded-md px-3 py-1.5 font-display text-sm uppercase tracking-wide',
-                step === n
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <span className="text-primary">{n}</span>{' '}
-              {n === 1 ? 'Picks' : 'My build'}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-4">
-        {step === 1 ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {SIDES.map((side) => (
-                <section key={side.key} className="space-y-3">
-                  <h2
-                    className={cn(
-                      'font-display text-sm uppercase tracking-widest',
-                      side.key === 'team' ? 'text-ally' : 'text-enemy',
-                    )}
-                  >
-                    {side.label} picks
-                  </h2>
+      <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-4">
+        <section className="space-y-4">
+          <PhaseTitle n={1}>Picks</PhaseTitle>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {SIDES.map((side) => (
+              <div key={side.key} className="space-y-3">
+                <h3
+                  className={cn(
+                    'font-display text-sm uppercase tracking-widest',
+                    side.key === 'team' ? 'text-ally' : 'text-enemy',
+                  )}
+                >
+                  {side.label} picks{' '}
+                  <span className="text-muted-foreground">{counts[side.key]} / 5</span>
+                </h3>
+                {/* A full side needs no more typing, so the box goes. */}
+                {counts[side.key] < 5 && (
                   <HeroEntry
                     onChoose={(hero) => addPick(side.key, hero)}
                     unavailable={taken}
-                    onBareKey={laneShortcut}
                     autoFocus={side.key === 'enemy'}
+                    portraits={portraits}
                   />
-                  <PickList
-                    picks={draft.picks[side.key]}
-                    side={side.key}
-                    activeIndex={
-                      activeChip?.side === side.key ? activeChip.index : null
-                    }
-                    onLane={(i, lane) => setLane(side.key, i, lane)}
-                    onRemove={(i) => removePick(side.key, i)}
-                  />
-                </section>
-              ))}
-            </div>
+                )}
+                <PickList
+                  picks={draft.picks[side.key]}
+                  side={side.key}
+                  onLane={(i, lane) => setLane(side.key, i, lane)}
+                  onRemove={(i) => removePick(side.key, i)}
+                  portraits={portraits}
+                  me={
+                    side.key === 'team' && draft.myHero
+                      ? { hero: draft.myHero, lane: draft.myLane }
+                      : undefined
+                  }
+                />
+              </div>
+            ))}
+          </div>
 
-            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-              Type a few letters, Enter to add. The lane is filled in for you — press
-              1–5 or click to change it: 1 exp · 2 mid · 3 jungle · 4 gold · 5 roam.
-              ⌘/Ctrl+Enter asks.
-            </p>
-          </>
-        ) : (
-          <section className="max-w-sm space-y-3">
-            <h2 className="font-display text-sm uppercase tracking-widest text-primary">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Type a few letters, Enter to add. The lane is filled in for you. Tap
+            another lane to change it.
+          </p>
+
+          <AskPanel
+            label="Suggest heroes"
+            prompt={prompts.pick}
+            answer={answers.pick}
+            loading={loading.pick}
+            error={errors.pick}
+            portraits={portraits}
+            onAsk={askPicks}
+          />
+        </section>
+
+        <section className="space-y-4 border-t border-border pt-6">
+          <PhaseTitle n={2}>My build</PhaseTitle>
+          <div className="max-w-sm space-y-3">
+            <h3 className="font-display text-sm uppercase tracking-widest text-primary">
               The hero I picked
-            </h2>
+            </h3>
             <HeroEntry
               onChoose={(hero) => setDraft((d) => ({ ...d, myHero: hero }))}
-              // My own team's picks stay selectable — only the enemy's are gone.
+              // My own team's picks stay selectable; only the enemy's are gone.
               unavailable={draft.picks.enemy.map((p) => p.hero)}
-              autoFocus
+              portraits={portraits}
             />
             {draft.myHero && (
-              <p className="font-display text-lg">
-                {draft.myHero}{' '}
-                <span className="text-muted-foreground">
-                  — {laneLabel(draft.myLane)}
+              <p className="flex items-center gap-2 font-display text-lg">
+                {portraits[draft.myHero] && (
+                  <GameImage src={portraits[draft.myHero]!} className="size-10 rounded-full" />
+                )}
+                <span>
+                  {draft.myHero}{' '}
+                  <span className="text-muted-foreground">({laneLabel(draft.myLane)})</span>
                 </span>
               </p>
             )}
-          </section>
-        )}
+          </div>
+
+          <AskPanel
+            label="Suggest build"
+            prompt={prompts.build}
+            answer={answers.build}
+            loading={loading.build}
+            error={errors.build}
+            portraits={portraits}
+            onAsk={askBuild}
+          />
+        </section>
       </main>
 
-      <AnswerBar
-        prompt={prompt}
-        answer={answer}
-        loading={loading}
-        error={error}
-        asksToday={countToday(usage, day)}
-        onAsk={() => ask(prompt)}
+      <ChangelogDialog
+        open={changelogOpen}
+        onOpenChange={setChangelogOpen}
+        releases={releases}
       />
 
       <PoolDialog
@@ -443,6 +495,7 @@ export function DraftHelper() {
         onOpenChange={setPoolOpen}
         pool={pool}
         onChange={setPool}
+        portraits={portraits}
       />
     </>
   );

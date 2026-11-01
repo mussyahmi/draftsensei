@@ -1,0 +1,53 @@
+// Picks out which item or battle spell a line of a build answer is about, so
+// the answer bar can put its icon beside it.
+
+// Gemini tags each item with core or situational after a bracket or a colon;
+// the name is whatever comes before. A dash stays, because the shop writes a
+// blessed boots as "Tough Boots - Encourage".
+const nameOf = (text: string) => {
+  const name = text.replace(/\*\*/g, '').split(/\s*[(:]/)[0].trim();
+  return name || null;
+};
+
+// Gemini sometimes puts a markdown bullet in front of the number too.
+const itemLine = (line: string) => line.match(/^\s*(?:[*-]\s+)?\d+[.)]\s+(.+)$/);
+
+export function itemOf(line: string): string | null {
+  const spell = line.match(/battle spell\W*?:\**\s*(.+)$/i);
+  if (spell) return nameOf(spell[1]);
+  const item = itemLine(line);
+  return item ? nameOf(item[1]) : null;
+}
+
+// Which hero a line of a pick answer is about: one whose name the line opens
+// with, once any number, bullet or bold markers are out of the way. A reason
+// that mentions a hero further in is not about that hero.
+export function heroOf(line: string, heroes: string[]): string | null {
+  const text = line.replace(/\*\*/g, '').replace(/^\s*(?:[*-]\s+)?(?:\d+[.)]\s+)?/, '').toLowerCase();
+  let found: string | null = null;
+  for (const hero of heroes) {
+    const name = hero.toLowerCase();
+    // The name must end where a word does, so Sun does not match Sunny, and
+    // the longest match wins, so Yi Sun-shin is not read as Yi.
+    if (text.startsWith(name) && !/[a-z0-9]/.test(text.charAt(name.length))) {
+      if (!found || hero.length > found.length) found = hero;
+    }
+  }
+  return found;
+}
+
+// The build reads best as one row of items in buying order, with the spell
+// and the advice lines around it left as text.
+export type Block = { line: number } | { items: string[] };
+
+export function buildBlocks(text: string): Block[] {
+  const blocks: Block[] = [];
+  text.split('\n').forEach((line, i) => {
+    const item = itemLine(line) && itemOf(line);
+    if (!item) return void blocks.push({ line: i });
+    const last = blocks.at(-1);
+    if (last && 'items' in last) last.items.push(item);
+    else blocks.push({ items: [item] });
+  });
+  return blocks;
+}

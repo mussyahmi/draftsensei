@@ -26,16 +26,17 @@ which runs on the server.
 
 ## How it works
 
-Two steps:
+One page, two phases, each with its own ask button and answer:
 
 1. **Picks** — type a few letters, Enter to add. Each hero's lane is filled in
-   from `lib/heroes.ts`; press `1`–`5` or click to change it. Two heroes in one
-   lane raises a warning, because one of the guesses is wrong.
-2. **My build** — the hero you ended up on, for the spell and item answer.
+   from `lib/heroes.ts`; tap another lane to change it. Two heroes in one
+   lane raises a warning, because one of the guesses is wrong. **Suggest
+   heroes** asks which hero to pick, using real counter stats for the board.
+2. **My build** — the hero you ended up on. **Suggest build** asks for the
+   spell and items, checked against the current shop.
 
-**Ask** (or `Cmd/Ctrl+Enter`) sends the prompt. Change a pick afterwards and the
-answer dims with *picks changed* — it was computed from a board that no longer
-exists.
+Change a pick afterwards and the answer dims with *picks changed* — it was
+computed from a board that no longer exists.
 
 **My heroes** holds a pool per lane. When the lane you are on has a pool, the
 answer only suggests from it.
@@ -99,15 +100,21 @@ One draft is two asks, so 500/day is roughly 250 games. Not a constraint.
 `gemini-2.5-flash` is retired for keys made after its cutoff — it answers 404
 with *"no longer available to new users"*. Don't put it in the chain.
 
-The route tries `gemini-flash-latest` first for answer quality and falls back to
-`gemini-3.5-flash-lite`. The fallback is not only about quota: Flash returns 503
-*"experiencing high demand"* often, and a draft cannot wait. Override either
-with `GEMINI_MODEL` and `GEMINI_FALLBACK_MODEL`; if Flash is busy more often
-than not, set `GEMINI_MODEL=gemini-3.5-flash-lite` and skip the wasted attempt.
+The route asks one model, `gemini-3.5-flash-lite`. Flash gave better answers
+but ran out of free quota mid-draft and often answered 503 *"experiencing high
+demand"*, so trying it first mostly wasted a request. Override the model with
+`GEMINI_MODEL`.
 
-The *asks today* counter is this app's own tally in `localStorage`. It is a
-rough gauge: it drifts if the key is used elsewhere, and it cannot see the real
-remaining quota — the console above is authoritative.
+The header's *N / 500 asks today* is shared by every visitor, because every
+ask goes through the one server key. The server counts each answer in
+Firestore (`usage/{day}`, written only through the admin SDK) and the day
+turns over at midnight Pacific, when Google resets the quota. It is still our
+own count, not Google's: refused asks are not counted and other uses of the key
+are invisible to it, so the console above is authoritative.
+
+The admin SDK finds credentials on its own: the App Hosting service account in
+production, and on a laptop whatever `gcloud auth application-default login`
+set up. Without them the count is simply not shown.
 
 ## Commands
 
@@ -126,6 +133,23 @@ it. Two options:
 - **Vercel** — free tier, static pages plus the API route. Set `GEMINI_API_KEY`
   in the project's environment variables.
 - **Firebase App Hosting** — keeps you on Firebase, but needs the Blaze plan.
+
+## Releasing
+
+Every deploy gets a version, and every version gets a changelog entry. While
+working, note user-facing changes under **Unreleased** in
+[`CHANGELOG.md`](CHANGELOG.md). Then, before each deploy:
+
+1. Pick the next version: patch (`0.2.1`) for fixes only, minor (`0.3.0`)
+   for anything new.
+2. Bump it without a git tag: `npm version minor --no-git-tag-version`
+   (or `patch`).
+3. In `CHANGELOG.md`, rename **Unreleased** to `## [0.3.0] - YYYY-MM-DD` and
+   start a fresh empty **Unreleased** above it.
+4. `npm test`. It fails if the changelog's latest version does not match
+   `package.json`.
+5. Commit, then deploy. The header shows the new version once it is live,
+   and clicking it opens the changelog for players. Unreleased is never shown.
 
 ## `legacy/`
 

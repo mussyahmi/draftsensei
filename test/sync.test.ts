@@ -3,7 +3,6 @@ import { newer, readSnapshot, type Snapshot } from '../lib/sync';
 import { newDraft, newPool } from '../lib/draft';
 
 const snap = (updatedAt: number, myHero = ''): Snapshot => ({
-  step: 1,
   draft: { ...newDraft(), myHero },
   pool: newPool(),
   updatedAt,
@@ -32,11 +31,15 @@ test('a well-formed stored document reads back whole', () => {
 test('a document saved by an older version still reads, with gaps filled', () => {
   const read = readSnapshot({ draft: { myHero: 'Kagura' }, updatedAt: 7 });
   expect(read).toEqual({
-    step: 1,
     draft: { ...newDraft(), myHero: 'Kagura' },
     pool: newPool(),
     updatedAt: 7,
   });
+});
+
+test('the old picks-or-build tab in a saved document is dropped', () => {
+  const read = readSnapshot({ step: 2, draft: {}, updatedAt: 7 });
+  expect(read).not.toHaveProperty('step');
 });
 
 test('anything that is not a document reads as nothing', () => {

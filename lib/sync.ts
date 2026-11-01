@@ -3,7 +3,6 @@ import { newDraft, newPool, type Draft, type Pool } from './draft';
 // What one account keeps in the cloud: the draft in progress and the hero pool,
 // with the time it was written so two devices can agree on which is current.
 export type Snapshot = {
-  step: 1 | 2;
   draft: Draft;
   pool: Pool;
   updatedAt: number;
@@ -28,7 +27,6 @@ export const readSnapshot = (value: unknown): Snapshot | null => {
   const pool = isRecord(value.pool) ? value.pool : {};
 
   return {
-    step: value.step === 2 ? 2 : 1,
     draft: { ...newDraft(), ...(value.draft as Partial<Draft>) },
     pool: { ...newPool(), ...(pool as Partial<Pool>) },
     updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : 0,

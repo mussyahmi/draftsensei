@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -38,26 +39,37 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
           never drop you out of your account in the middle of a draft. */}
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="sm" className="max-w-48">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={account.email ?? 'Signed in'}
+            className="max-w-48"
+          >
             {busy ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Icon className={problem ? 'size-3.5 text-destructive' : 'size-3.5'} />
             )}
-            <span className="truncate">{account.email ?? 'Signed in'}</span>
+            {/* A full email crowds the header off one row on a phone; there
+                the cloud alone says signed in, and the menu says as whom. */}
+            <span className="hidden truncate sm:inline">{account.email ?? 'Signed in'}</span>
           </Button>
         }
       />
       <DropdownMenuContent align="end" className="max-w-72">
-        <DropdownMenuLabel className="font-normal">
-          {problem ? (
-            <span className="text-destructive">{problem}</span>
-          ) : (
-            <span className="text-muted-foreground">
-              Saved to your account. Open it on your phone and the draft follows.
-            </span>
-          )}
-        </DropdownMenuLabel>
+        {/* Base UI only allows a menu label inside a group. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-normal">
+            {account.email && <span className="block truncate text-foreground">{account.email}</span>}
+            {problem ? (
+              <span className="text-destructive">{problem}</span>
+            ) : (
+              <span className="text-muted-foreground">
+                Saved to your account. Sign in on another device and your draft follows.
+              </span>
+            )}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onSignOut}>
           <LogOut className="size-3.5" />

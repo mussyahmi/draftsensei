@@ -51,7 +51,10 @@ export const newPool = (): Pool =>
 export const poolFor = (pool: Pool | undefined, lane: Lane) => (pool && pool[lane]) || [];
 
 export function pickPrompt(draft: Draft, pool?: Pool) {
-  const mine = poolFor(pool, draft.myLane);
+  // A hero either side already took cannot be picked again, so it is no use
+  // suggesting it, even when it sits in my pool.
+  const picked = new Set([...draft.picks.enemy, ...draft.picks.team].map((p) => p.hero));
+  const mine = poolFor(pool, draft.myLane).filter((h) => !picked.has(h));
   return [
     `suggest mobile legends ${laneLabel(draft.myLane)} hero`,
     '',
@@ -60,13 +63,22 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
     `my team pick: ${withLanes(draft.picks.team)}`,
     '',
     'answer with hero names, each with a reason of 6 words max',
+    'do not suggest a hero already picked by either team',
     ...(mine.length
       ? ['', `only suggest from my heroes: ${mine.map((h) => h.toLowerCase()).join(', ')}`]
       : []),
   ].join('\n');
 }
 
+// Roamers and junglers enchant their boots with a blessing, and the right one
+// matters as much as the items, so ask for it by name.
+const BLESSINGS: Partial<Record<Lane, string>> = {
+  roam: 'roam blessing',
+  jungle: 'jungle blessing',
+};
+
 export function buildPrompt(draft: Draft) {
+  const blessing = BLESSINGS[draft.myLane];
   return [
     `suggest mobile legends spell and item build for ${(draft.myHero || '...').toLowerCase()} (${laneLabel(draft.myLane)})`,
     '',
@@ -76,9 +88,9 @@ export function buildPrompt(draft: Draft) {
     '',
     'answer short, no paragraphs:',
     '- battle spell',
-    '- 6 items in build order, names only, each marked core or situational',
-    '- mark as many core as this hero really needs, do not force 3 and 3',
-    '- order by when to buy, so a situational item can come before a core one',
+    '- 6 items, numbered 1 to 6, names only, no other notes',
+    '- order them by when to buy',
+    ...(blessing ? [`- boots first, and name which ${blessing} to put on them`] : []),
     '',
     'then 3 short lines: which lane to help first, who to use my ult on, our win condition',
   ].join('\n');

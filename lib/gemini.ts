@@ -1,18 +1,19 @@
 // Everything here is pure, so the request shape and the answer parsing are
 // testable without spending a call on Google.
 
-export const DEFAULT_MODEL = 'gemini-flash-latest';
-
-// Flash-Lite carries a much larger free daily allowance, so it is what we fall
-// back to when the better model's quota is gone for the day.
-export const FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+// Flash-Lite carries a much larger free daily allowance than Flash, whose
+// quota ran out mid-draft often enough that it was not worth trying first.
+export const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
 export type GeminiPayload = {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 };
 
-export const requestBody = (prompt: string) => ({
+// Search lets Gemini read the current patch instead of recalling items that
+// have since been reworked or removed from the shop.
+export const requestBody = (prompt: string, search = false) => ({
   contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  ...(search ? { tools: [{ google_search: {} }] } : {}),
   generationConfig: { temperature: 0.4, maxOutputTokens: 600 },
 });
 
@@ -21,20 +22,10 @@ export const extractText = (payload: GeminiPayload) =>
     .map((p) => p.text ?? '')
     .join('');
 
-export const modelChain = (primary: string, fallback: string) =>
-  primary === fallback ? [primary] : [primary, fallback];
-
-// Reasons to give up on one model and try the next rather than fail the draft:
-// 429 the daily quota is gone; 403 the key cannot use it; 404 it was retired
-// for new keys; 500/503 it is up but buckling under load, which Flash does
-// often enough to matter mid-draft.
-export const shouldTryNextModel = (status: number) =>
-  [403, 404, 429, 500, 503].includes(status);
-
 export const endpoint = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-// Flash answers in a second or two most days, but under load it has taken
+// Gemini answers in a second or two most days, but under load it has taken
 // close to a minute, which is useless mid-draft and long enough for a proxy
-// in front of us to give up. Abandon a stalled model and try the next.
+// in front of us to give up.
 export const MODEL_TIMEOUT_MS = 15_000;

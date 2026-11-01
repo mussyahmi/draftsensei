@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { LANES, laneLabel, poolFor, type Lane, type Pool } from '@/lib/draft';
+import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,9 +19,10 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   pool: Pool;
   onChange: (pool: Pool) => void;
+  portraits: Record<string, string | null>;
 };
 
-export function PoolDialog({ open, onOpenChange, pool, onChange }: Props) {
+export function PoolDialog({ open, onOpenChange, pool, onChange, portraits }: Props) {
   const add = (lane: Lane, hero: string) => {
     if (poolFor(pool, lane).includes(hero)) return;
     onChange({ ...pool, [lane]: [...poolFor(pool, lane), hero] });
@@ -50,20 +52,25 @@ export function PoolDialog({ open, onOpenChange, pool, onChange }: Props) {
               <HeroEntry
                 onChoose={(hero) => add(lane.key, hero)}
                 unavailable={poolFor(pool, lane.key)}
+                portraits={portraits}
               />
               {poolFor(pool, lane.key).length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {poolFor(pool, lane.key).map((hero) => (
                     <span
                       key={hero}
-                      className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-sm"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-secondary py-0.5 ps-0.5 pe-1 text-sm"
                     >
-                      {hero}
+                      {portraits[hero] && (
+                        <GameImage src={portraits[hero]!} className="size-6 rounded-full" />
+                      )}
+                      <span className={portraits[hero] ? '' : 'ps-1.5'}>{hero}</span>
                       <button
                         type="button"
                         aria-label={`Remove ${hero}`}
                         onClick={() => drop(lane.key, hero)}
-                        className="text-muted-foreground hover:text-destructive"
+                        // Padding makes a thumb-sized target around a small cross.
+                        className="rounded-full p-1.5 text-muted-foreground hover:text-destructive"
                       >
                         <X className="size-3" />
                       </button>

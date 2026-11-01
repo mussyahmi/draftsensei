@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { HEROES } from '@/lib/heroes';
 import { searchHeroes } from '@/lib/draft';
+import { GameImage } from '@/components/game-image';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -10,10 +11,10 @@ type Props = {
   onChoose: (hero: string) => void;
   unavailable: string[];
   placeholder?: string;
-  /** Keys handled only when the box is empty — the 1–5 lane override. */
-  onBareKey?: (key: string) => boolean;
   autoFocus?: boolean;
   className?: string;
+  // Portraits by hero name, shown beside each match.
+  portraits?: Record<string, string | null>;
 };
 
 const MAX = 6;
@@ -22,9 +23,9 @@ export function HeroEntry({
   onChoose,
   unavailable,
   placeholder = 'Type a hero…',
-  onBareKey,
   autoFocus,
   className,
+  portraits = {},
 }: Props) {
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -65,11 +66,7 @@ export function HeroEntry({
             choose(matches[cursor]);
             return;
           }
-          if (e.key === 'Escape') {
-            setQuery('');
-            return;
-          }
-          if (!query && onBareKey?.(e.key)) e.preventDefault();
+          if (e.key === 'Escape') setQuery('');
         }}
         className="h-10 bg-background/60 font-medium"
       />
@@ -86,10 +83,15 @@ export function HeroEntry({
                   choose(hero);
                 }}
                 className={cn(
-                  'block w-full px-3 py-1.5 text-left text-sm',
+                  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm sm:py-1',
                   i === cursor ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
                 )}
               >
+                {portraits[hero] ? (
+                  <GameImage src={portraits[hero]!} className="size-7 rounded-full" />
+                ) : (
+                  <span className="size-7 shrink-0 rounded-full bg-muted" />
+                )}
                 {hero}
               </button>
             </li>

@@ -7,11 +7,10 @@ import { cn } from '@/lib/utils';
 type Props = {
   value: Lane;
   onChange: (lane: Lane) => void;
-  size?: 'sm' | 'default';
   className?: string;
 };
 
-export function LanePicker({ value, onChange, size = 'default', className }: Props) {
+export function LanePicker({ value, onChange, className }: Props) {
   return (
     <ToggleGroup
       // Base UI models the group's state as the list of pressed items, even
@@ -31,8 +30,7 @@ export function LanePicker({ value, onChange, size = 'default', className }: Pro
           aria-label={laneLabel(lane.key)}
           title={laneLabel(lane.key)}
           className={cn(
-            'font-display uppercase tracking-wide aria-pressed:bg-primary aria-pressed:text-primary-foreground',
-            size === 'sm' ? 'h-6 min-w-6 px-1.5 text-[11px]' : 'h-8 px-2.5 text-xs',
+            'h-10 flex-1 px-2.5 font-display text-xs uppercase tracking-wide aria-pressed:bg-primary aria-pressed:text-primary-foreground sm:h-8 sm:flex-none',
           )}
         >
           {lane.key}
