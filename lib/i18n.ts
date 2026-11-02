@@ -32,7 +32,7 @@ const en = {
   howTo: [
     "Choose your lane and rank below. They're remembered.",
     "Type each hero as it's picked in game. Suggestions update as you go.",
-    'Tap a suggested hero to make it yours, then tap Suggest build.',
+    'Tap a suggested hero to make it yours. Its build shows up, ready to adjust for the enemy team.',
   ],
   howToTip: 'Works best on a second screen: a laptop, tablet or another phone beside you while you play.',
 
@@ -46,7 +46,13 @@ const en = {
   unban: (hero: string) => `Unban ${hero}`,
 
   bestForLane: 'Best for your lane right now, tap to pick',
-  topBuild: (win: number) => `Top build in ranked games, ${win}% win. Suggest build fits it to this enemy team.`,
+  askAiPick: 'Ask AI to choose',
+  aiChose: 'Chosen by AI for this team comp, tap to pick. Marked heroes are new.',
+  newPick: 'New pick from the AI',
+  topBuild: (win: number) => `Top build in ranked games, ${win}% win.`,
+  adjustBuild: 'Adjust for enemy team',
+  adjusted: 'Adjusted for this enemy team from the top ranked build. Marked items are the changes.',
+  changedItem: 'Changed for this enemy team',
   buildItems: 'Items in buying order',
   pickHero: (hero: string) => `Pick ${hero}`,
   // How an instant pick's reason reads: "+1.2% win vs Layla, +3.6% with Kaja".
@@ -116,7 +122,7 @@ const ms: Strings = {
   howTo: [
     'Pilih lorong dan pangkat anda di bawah. Ia akan diingati.',
     'Taip setiap hero sebaik sahaja ia dipilih dalam permainan. Cadangan dikemas kini serta-merta.',
-    'Ketik hero yang dicadangkan untuk memilihnya, kemudian ketik Cadangkan binaan.',
+    'Ketik hero yang dicadangkan untuk memilihnya. Binaannya terus dipaparkan, sedia untuk disesuaikan ikut musuh.',
   ],
   howToTip: 'Paling sesuai di skrin kedua: komputer riba, tablet atau telefon lain di sebelah anda semasa bermain.',
 
@@ -130,7 +136,13 @@ const ms: Strings = {
   unban: (hero) => `Batal sekatan ${hero}`,
 
   bestForLane: 'Terbaik untuk lorong anda sekarang, ketik untuk memilih',
-  topBuild: (win) => `Binaan terbaik dalam perlawanan ranked, ${win}% menang. Cadangkan binaan menyesuaikannya dengan pasukan musuh ini.`,
+  askAiPick: 'Minta AI pilih',
+  aiChose: 'Dipilih oleh AI untuk komposisi pasukan ini, ketik untuk memilih. Hero bertanda ialah pilihan baharu.',
+  newPick: 'Pilihan baharu daripada AI',
+  topBuild: (win) => `Binaan terbaik dalam perlawanan ranked, ${win}% menang.`,
+  adjustBuild: 'Sesuaikan ikut musuh',
+  adjusted: 'Disesuaikan untuk pasukan musuh ini daripada binaan ranked terbaik. Item bertanda ialah perubahannya.',
+  changedItem: 'Ditukar untuk pasukan musuh ini',
   buildItems: 'Item ikut urutan beli',
   pickHero: (hero) => `Pilih ${hero}`,
   reasonWords: { win: 'menang', with: 'bersama' },

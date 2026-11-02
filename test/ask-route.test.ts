@@ -153,7 +153,7 @@ const builds = (url: string) => {
   return null;
 };
 
-test('a build ask hands Gemini the top builds for my hero and lane', async () => {
+test('a build ask has Gemini adjust the build the player already sees', async () => {
   let sent = '';
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
     const arena = builds(url);
@@ -164,8 +164,34 @@ test('a build ask hands Gemini the top builds for my hero and lane', async () =>
 
   await ask('suggest a build', true, undefined, { hero: 'Angela', lane: 'roam' });
   expect(sent).toContain([
+    'the build the player already sees, from ranked games (56.9% win):',
+    'flicker, support emblem (inspire)',
+    'items: flask of the oasis, glowing wand',
+    'adjust it for this enemy team: keep its battle spell, emblem and talents, keep every item that still fits, and swap only the items this enemy team calls for',
+  ].join('\n'));
+});
+
+test('with no build played widely enough to show, Gemini gets the top builds to start from', async () => {
+  let sent = '';
+  vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+    if (url.includes('/47/builds?lane=roam')) {
+      return new Response(JSON.stringify({ data: { records: [{ data: { build: [{
+        build_win_rate: 0.569, build_pick_rate: 0.02,
+        battleskill: { data: { __data: { skillname: 'Flicker' } } },
+        emblem: { data: { emblemname: 'Support' } },
+        equipid: [1, 2], new_rune_skill: [611],
+      }] } }] } }));
+    }
+    const arena = builds(url);
+    if (arena) return arena;
+    sent = promptOf(init);
+    return answer('Flicker');
+  });
+
+  await ask('suggest a build', true, undefined, { hero: 'Angela', lane: 'roam' });
+  expect(sent).toContain([
     'top builds for this hero and lane from ranked games:',
-    '56.9% win, 12.9% pick: flicker, support emblem (inspire), core items flask of the oasis, glowing wand',
+    '56.9% win, 2.0% pick: flicker, support emblem (inspire), core items flask of the oasis, glowing wand',
     'start from the best of these: keep its battle spell, emblem, talents and core items, and choose the other items for this enemy team',
   ].join('\n'));
 });

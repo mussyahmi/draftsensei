@@ -13,7 +13,8 @@ import {
   type Pool,
   type Side,
 } from '@/lib/draft';
-import { HERO_LANES } from '@/lib/heroes';
+import { HERO_LANES, HEROES } from '@/lib/heroes';
+import { picksOf } from '@/lib/icons';
 import type { Picks } from '@/lib/matchups';
 import { DAILY_LIMIT } from '@/lib/quota';
 import {
@@ -302,6 +303,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             model: data.model ?? '',
             searched: data.searched ?? false,
             build: phase === 'build',
+            hero: (extra as { hero?: string }).hero,
           }),
         );
         if (typeof data.used === 'number') setUsed(data.used);
@@ -434,6 +436,15 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
   const t = STRINGS[draft.lang];
 
+  // The AI's picks for the board as it is now. Once the board changes they
+  // are about a draft that no longer exists, and the fresh chips return.
+  const answeredPicks = answers.pick ? picksOf(answers.pick.text, HEROES) : [];
+  const aiPicks = answers.pick && answers.pick.prompt === prompts.pick ? answeredPicks : null;
+
+  const top = topBuild && topBuild.for === `${draft.myHero}|${draft.myLane}|${draft.rank}` ? topBuild : null;
+  // An answer for a hero I have since swapped is not an adjustment of this one.
+  const adjusted = answers.build !== null && answers.build.hero === draft.myHero;
+
   return (
     <LangProvider lang={draft.lang}>
       <header className="border-b border-border bg-card/60">
@@ -521,6 +532,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             <PickSuggestions
               // An emptied board keeps no stale picks from before.
               ranked={picks.enemy.length || picks.team.length ? instant : []}
+              ai={aiPicks}
               portraits={portraits}
               onPick={(hero) => setDraft((d) => ({ ...d, myHero: hero }))}
             />
@@ -566,7 +578,11 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
 
           <AskPanel
-            label={t.suggestHeroes}
+            label={instant.length && (picks.enemy.length || picks.team.length) ? t.askAiPick : t.suggestHeroes}
+            // The AI's picks show as the chips above, and once the board moves
+            // on the fresh chips take over; only an answer that names no hero
+            // is left to read as text.
+            showAnswer={!answeredPicks.length}
             prompt={prompts.pick}
             answer={answers.pick}
             loading={loading.pick}
@@ -601,12 +617,13 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             )}
           </div>
 
-          {topBuild && topBuild.for === `${draft.myHero}|${draft.myLane}|${draft.rank}` && (
-            <InstantBuild top={topBuild} />
-          )}
+          {/* One build on screen: the ranked one until the AI has adjusted it
+              for this enemy team, then the adjusted one in its place. */}
+          {top && !adjusted && <InstantBuild top={top} />}
 
           <AskPanel
-            label={t.suggestBuild}
+            label={top ? t.adjustBuild : t.suggestBuild}
+            baseline={top?.build.items}
             prompt={prompts.build}
             answer={answers.build}
             loading={loading.build}

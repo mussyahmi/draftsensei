@@ -16,7 +16,11 @@ export type Answer = {
   model: string;
   searched: boolean;
   build: boolean;
+  // The hero a build answer is for, so a changed hero never shows it.
+  hero?: string;
 };
+
+const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 function TextLine({ line, icon }: { line: Line; icon: string | null }) {
   return (
@@ -53,11 +57,26 @@ type Props = {
   // Every hero's portrait by name, for the lines of a pick answer.
   portraits: Record<string, string | null>;
   onAsk: () => void;
+  // The ranked build this answer adjusts, if there was one: items not in it
+  // are marked as changed for this enemy team.
+  baseline?: string[];
+  // False when the page shows the answer its own way, as pick chips.
+  showAnswer?: boolean;
 };
 
 // One phase's ask button with its answer underneath. The page has two: hero
 // picks, then my build.
-export function AskPanel({ label, prompt, answer, loading, error, portraits, onAsk }: Props) {
+export function AskPanel({
+  label,
+  prompt,
+  answer,
+  loading,
+  error,
+  portraits,
+  onAsk,
+  baseline,
+  showAnswer = true,
+}: Props) {
   const t = useT();
   const [showPrompt, setShowPrompt] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -151,7 +170,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
         </Button>
       </div>
 
-      {answer && (
+      {answer && showAnswer && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {!stale && answer.model}
@@ -175,7 +194,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
         </p>
       )}
 
-      {answer && !error && !collapsed && (
+      {answer && showAnswer && !error && !collapsed && (
         <div
           className={cn(
             'rounded-lg border border-border bg-card/60 p-3',
@@ -187,13 +206,25 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
               {t.stale}
             </p>
           )}
+          {answer.build && baseline && (
+            <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="size-2 shrink-0 rounded-full bg-primary" />
+              {t.adjusted}
+            </p>
+          )}
           <div className="space-y-0.5 text-base leading-snug">
             {blocks.map((block, b) =>
               'items' in block ? (
                 // The six items side by side in buying order, name under icon.
                 <ol key={b} className="grid max-w-lg grid-cols-6 gap-2 py-1.5">
                   {block.items.map((name, k) => (
-                    <li key={k} className="flex flex-col items-center gap-1 text-center">
+                    <li key={k} className="relative flex flex-col items-center gap-1 text-center">
+                      {baseline && !baseline.some((b) => squash(b) === squash(name)) && (
+                        <span
+                          aria-label={t.changedItem}
+                          className="absolute -top-0.5 end-0 size-2.5 rounded-full bg-primary ring-2 ring-card"
+                        />
+                      )}
                       {icons[name] ? (
                         <GameImage src={icons[name]} className="size-10 sm:size-12" />
                       ) : (

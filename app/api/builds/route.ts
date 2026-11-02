@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
-import { iconFor, loadBuilds, loadCatalog, loadCommunity } from '@/lib/arena';
-import { fullBuild } from '@/lib/builds';
+import { iconFor, loadCatalog } from '@/lib/arena';
 import { LANES, RANKS } from '@/lib/draft';
+import { loadTopBuild } from '@/lib/top-build';
 
-// The Academy's winning build for my hero and lane, with its icons, so the
-// page can show it the moment the hero is chosen. No Gemini, so no wait and
-// no ask spent.
-const MIN_PICK_RATE = 0.05;
-
+// The winning build for my hero and lane, with its icons, so the page can
+// show it the moment the hero is chosen. No Gemini, so no wait and no ask
+// spent.
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const hero = params.get('hero')?.trim();
@@ -15,19 +13,11 @@ export async function GET(request: Request) {
   const rank = RANKS.find((r) => r.key === params.get('rank'))?.key ?? 'all';
   if (!hero || !lane) return NextResponse.json({ error: 'Need a hero and a lane.' }, { status: 400 });
 
-  const [builds, catalog, community] = await Promise.all([
-    loadBuilds(hero, lane, rank).catch(() => []),
+  const [build, catalog] = await Promise.all([
+    loadTopBuild(hero, lane, rank),
     loadCatalog().catch(() => null),
-    loadCommunity(hero).catch(() => []),
   ]);
-  // A build few people play can top the win rates by luck, like a mage on an
-  // assassin emblem. Only one that is played in a fair share of games shows
-  // instantly; otherwise Suggest build is the answer.
-  const winning = builds.find((b) => b.pickRate >= MIN_PICK_RATE);
-  if (!winning) return NextResponse.json(null, { headers: { 'cache-control': 'no-store' } });
-  // The Academy keeps three core items a build; the rest of the six come from
-  // what players' own builds agree on.
-  const build = { ...winning, items: fullBuild(winning.items, community) };
+  if (!build) return NextResponse.json(null, { headers: { 'cache-control': 'no-store' } });
 
   const names = [build.spell, build.emblem, ...build.items].filter(Boolean);
   const icons = Object.fromEntries(names.map((n) => [n, catalog ? iconFor(catalog, n) : null]));

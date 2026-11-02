@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { picksFrom, rankedFor } from '@/lib/matchups';
 
-// The best few heroes for my lane on the board as it stands, straight from
-// match data: no Gemini, so it answers in a moment and costs no ask.
-const INSTANT_PICKS = 3;
+// The best heroes for my lane on the board as it stands, straight from match
+// data: no Gemini, so it answers in a moment and costs no ask. As many as
+// Gemini chooses from, so any it picks has its numbers on its chip too.
+const INSTANT_PICKS = 8;
 
 export async function POST(request: Request) {
   let body: unknown;

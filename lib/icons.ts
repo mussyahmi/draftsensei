@@ -58,3 +58,17 @@ export function buildBlocks(text: string): Block[] {
   });
   return blocks;
 }
+
+// A pick answer as chips: each line that opens with a hero, and the reason
+// written after it. Lines about no hero, like a preamble, are dropped.
+export function picksOf(text: string, heroes: string[]): { hero: string; reason: string }[] {
+  const seen = new Set<string>();
+  return text.split('\n').flatMap((line) => {
+    const hero = heroOf(line, heroes);
+    if (!hero || seen.has(hero)) return [];
+    seen.add(hero);
+    const clean = line.replace(/\*\*/g, '').replace(/^\s*(?:[*-]\s+)?(?:\d+[.)]\s+)?/, '');
+    const reason = clean.slice(hero.length).replace(/^\s*[:\-\u2013\u2014]\s*/, '').trim();
+    return [{ hero, reason }];
+  });
+}

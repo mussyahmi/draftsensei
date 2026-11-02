@@ -9,6 +9,7 @@ import {
   type GeminiPayload,
 } from '@/lib/gemini';
 import { loadBuilds, loadCatalog } from '@/lib/arena';
+import { loadTopBuild } from '@/lib/top-build';
 import { buildLines } from '@/lib/builds';
 import { LANES, RANKS } from '@/lib/draft';
 import { matchupData, picksFrom } from '@/lib/matchups';
@@ -63,8 +64,20 @@ export async function POST(request: Request) {
   const myLane = LANES.find((l) => l.key === lane)?.key;
   if (build === true && typeof hero === 'string' && hero && myLane) {
     const myRank = RANKS.find((r) => r.key === rank)?.key ?? 'all';
-    const lines = buildLines(await loadBuilds(hero, myLane, myRank).catch(() => []));
-    if (lines.length) {
+    // When the page already shows a build, the answer adjusts that one, so
+    // what changed is a choice for this enemy team, not a different build.
+    const shown = await loadTopBuild(hero, myLane, myRank).catch(() => null);
+    const lines = shown ? [] : buildLines(await loadBuilds(hero, myLane, myRank).catch(() => []));
+    if (shown) {
+      asking = [
+        asking,
+        '',
+        `the build the player already sees, from ranked games (${(shown.winRate * 100).toFixed(1)}% win):`,
+        `${shown.spell}, ${shown.emblem} emblem (${shown.talents.join(', ')})`.toLowerCase(),
+        `items: ${shown.items.join(', ')}`.toLowerCase(),
+        'adjust it for this enemy team: keep its battle spell, emblem and talents, keep every item that still fits, and swap only the items this enemy team calls for',
+      ].join('\n');
+    } else if (lines.length) {
       asking = [
         asking,
         '',

@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { buildBlocks, itemOf } from '../lib/icons';
+import { buildBlocks, itemOf, picksOf } from '../lib/icons';
 
 test('a numbered build line gives the item name without its tag', () => {
   expect(itemOf('1. Tough Boots (Core)')).toBe('Tough Boots');
@@ -56,4 +56,13 @@ test('consecutive item lines gather into one row; everything else stays a line',
 
 test('an answer with no item lines is all lines', () => {
   expect(buildBlocks('Kagura\nHigh burst.')).toEqual([{ line: 0 }, { line: 1 }]);
+});
+
+test('a pick answer becomes chips: each hero line with its reason', () => {
+  const text = 'Here are my picks:\n1. **Aurora**: Synergizes wonderfully with Kaja.\n- Gord - Effectively punishes Ling.\nVexana: Outmatches Xavier directly.\nAurora: again';
+  expect(picksOf(text, ['Aurora', 'Gord', 'Vexana', 'Kaja'])).toEqual([
+    { hero: 'Aurora', reason: 'Synergizes wonderfully with Kaja.' },
+    { hero: 'Gord', reason: 'Effectively punishes Ling.' },
+    { hero: 'Vexana', reason: 'Outmatches Xavier directly.' },
+  ]);
 });

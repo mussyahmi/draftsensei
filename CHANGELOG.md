@@ -6,6 +6,16 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.5.2] - 2026-11-02
+
+### Changed
+- One hero list, not two: Ask AI to choose puts the AI's 3 picks in place of
+  the instant ones, as the same tappable chips with the AI's reason, and
+  marks any hero the AI added.
+- One build on screen, not two: Adjust for enemy team turns the ranked build
+  into one fitted to this match, in the same place, with the swapped items
+  marked. Heroes with no ranked build to show still use Suggest build.
+
 ## [0.5.1] - 2026-11-02
 
 ### Added
