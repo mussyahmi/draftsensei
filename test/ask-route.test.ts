@@ -252,11 +252,11 @@ test('a hero pick ask hands Gemini real counters for my lane', async () => {
   expect(sent).toBe([
     'suggest roam hero',
     '',
-    'match data from ranked games, win rate change for heroes who play my lane:',
+    'match data from ranked games for heroes who play my lane: their win rate at my rank, then how much it changes against the enemy and with my team:',
     'diggie: +3.1% vs enemy (best into sun +3.1%), +0.0% with my team',
     'akai: -2.0% vs enemy, +4.0% with my team (best with tigreal +4.0%)',
     'franco: +1.0% vs enemy (best into sun +1.0%), +0.5% with my team (best with tigreal +0.5%)',
-    'choose the best 3 from this match data; in each reason name the enemy hero it counters best, or the teammate it combos with if that gain is bigger, in your own words',
+    'choose the best 3 from this match data, counting both their win rate and the changes; in each reason name the enemy hero it counters best, or the teammate it combos with if that gain is bigger, in your own words',
   ].join('\n'));
 });
 

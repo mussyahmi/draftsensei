@@ -5,6 +5,7 @@ import { LANES, poolFor, type Lane, type Pool } from '@/lib/draft';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
 import { useT } from '@/components/lang';
+import { WinRate } from '@/components/win-rate';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,6 +22,8 @@ type Props = {
   pool: Pool;
   onChange: (pool: Pool) => void;
   portraits: Record<string, string | null>;
+  // Win rates at the player's rank, so a hero can be checked before adding it.
+  wins: Record<string, number>;
 };
 
 export function PoolDialog({
@@ -29,6 +32,7 @@ export function PoolDialog({
   pool,
   onChange,
   portraits,
+  wins,
 }: Props) {
   const t = useT();
   const add = (lane: Lane, hero: string) => {
@@ -48,19 +52,35 @@ export function PoolDialog({
           <DialogDescription>
             {t.poolHint}
           </DialogDescription>
+          {Object.keys(wins).length > 0 && (
+            <p className="text-sm text-muted-foreground">{t.poolWins}</p>
+          )}
         </DialogHeader>
 
 
         <div className="space-y-6">
           {LANES.map((lane) => (
             <div key={lane.key} className="space-y-2">
-              <h3 className="font-display text-sm uppercase tracking-wide text-muted-foreground">
-                {lane.key.toUpperCase()}
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-sm uppercase tracking-wide text-muted-foreground">
+                  {lane.key.toUpperCase()}
+                </h3>
+                {/* Starting a lane over is one tap, not a cross per hero. */}
+                {poolFor(pool, lane.key).length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ ...pool, [lane.key]: [] })}
+                    className="-my-2 px-2 py-2 text-sm text-muted-foreground hover:text-destructive"
+                  >
+                    {t.clearLane}
+                  </button>
+                )}
+              </div>
               <HeroEntry
                 onChoose={(hero) => add(lane.key, hero)}
                 unavailable={poolFor(pool, lane.key)}
                 portraits={portraits}
+                wins={wins}
               />
               {poolFor(pool, lane.key).length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -73,6 +93,7 @@ export function PoolDialog({
                         <GameImage src={portraits[hero]!} className="size-6 rounded-full" />
                       )}
                       <span className={portraits[hero] ? '' : 'ps-1.5'}>{hero}</span>
+                      {wins[hero] != null && <WinRate win={wins[hero]} />}
                       <button
                         type="button"
                         aria-label={t.remove(hero)}

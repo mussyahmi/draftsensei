@@ -92,6 +92,8 @@ const en = {
 
   poolHint:
     "The heroes you actually play. When the lane you're on has a list here, the answer only suggests from it.",
+  poolWins: 'The % is how often each hero won this week at your rank. Green means winning more than losing.',
+  clearLane: 'Clear',
   myRank: 'My rank',
   allRanks: 'All ranks',
   gloryUp: 'Mythical Glory and up',
@@ -182,6 +184,8 @@ const ms: Strings = {
 
   poolHint:
     'Hero yang anda benar-benar main. Jika lorong anda mempunyai senarai di sini, cadangan hanya diambil daripadanya.',
+  poolWins: 'Peratus ialah kadar kemenangan setiap hero minggu ini pada pangkat anda. Hijau bermaksud lebih banyak menang daripada kalah.',
+  clearLane: 'Kosongkan',
   myRank: 'Pangkat saya',
   allRanks: 'Semua pangkat',
   gloryUp: 'Mythical Glory ke atas',

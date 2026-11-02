@@ -6,6 +6,16 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.6.0] - 2026-11-02
+
+### Added
+- My heroes shows each hero's win rate this week at your rank, while you type and beside the heroes you added, so you can check a hero before adding it.
+- Hero I picked shows the same win rate while you type and beside your hero.
+- My heroes has a Clear button on each lane with two or more heroes.
+
+### Changed
+- Suggested picks start from each hero's win rate at your rank, then add its counters and combos, so a hero already winning more ranks above a weaker one with slightly bigger counters.
+
 ## [0.5.3] - 2026-11-02
 
 ### Fixed

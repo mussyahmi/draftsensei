@@ -84,3 +84,23 @@ test('a banned hero is not in the running', () => {
   const lanes = { Jawhead: 'jungle', Saber: 'jungle' } as const;
   expect(candidatesFor('jungle', [], [], lanes, ['Saber'])).toEqual(['Jawhead']);
 });
+
+test('a hero already winning more beats a weaker one with slightly bigger counters', () => {
+  const vsSun: Gains = new Map([['Jawhead', 0.03], ['Saber', 0.01]]);
+  const wins = new Map([['Jawhead', 0.46], ['Saber', 0.53]]);
+  const ranked = rankPicks(['Jawhead', 'Saber'], new Map([['Sun', vsSun]]), new Map(), undefined, wins);
+  expect(ranked.map((r) => r.hero)).toEqual(['Saber', 'Jawhead']);
+  expect(ranked[0].win).toBe(0.53);
+});
+
+test('a hero with no win rate is ranked as if it wins half its games', () => {
+  const vsSun: Gains = new Map([['Jawhead', 0.03], ['Saber', 0.01]]);
+  const ranked = rankPicks(['Jawhead', 'Saber'], new Map([['Sun', vsSun]]), new Map(), undefined, new Map([['Saber', 0.51]]));
+  expect(ranked.map((r) => r.hero)).toEqual(['Jawhead', 'Saber']);
+  expect(ranked[0].win).toBeUndefined();
+});
+
+test('Gemini sees each hero win rate at my rank before its matchups', () => {
+  expect(matchupLines([{ hero: 'Saber', against: 0.051, alongside: 0, best: null, win: 0.523 }], false))
+    .toEqual(['saber: 52.3% win at my rank, +5.1% vs enemy']);
+});

@@ -40,8 +40,9 @@ import { HeroEntry } from '@/components/hero-entry';
 import { YouCard } from '@/components/you-card';
 import { PickList } from '@/components/pick-list';
 import { PoolDialog } from '@/components/pool-dialog';
+import { WinRate } from '@/components/win-rate';
 import { BanList } from '@/components/ban-list';
-import type { MetaHero } from '@/lib/bans';
+import { winsBy, type MetaHero } from '@/lib/bans';
 import { PickSuggestions } from '@/components/pick-suggestions';
 import { HowTo } from '@/components/how-to';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
@@ -101,9 +102,11 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   // Every hero's portrait by name. Empty until loaded, or if the art source
   // is down, in which case names show alone.
   const [portraits, setPortraits] = useState<Record<string, string | null>>({});
-  // Every hero strongest first at my rank, for ban suggestions. Empty until
+  // Every hero strongest first at my rank, for ban suggestions and the win
+  // rates in My heroes. Empty until
   // loaded, or if the data source is down, in which case none are shown.
   const [meta, setMeta] = useState<MetaHero[]>([]);
+  const wins = winsBy(meta);
   // The best heroes for my lane as the board stands, from match data alone.
   const [instant, setInstant] = useState<Ranked[]>([]);
   // The Academy's winning build for my hero, shown before any ask. Kept
@@ -641,6 +644,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
               // My own team's picks stay selectable; only the enemy's are gone.
               unavailable={draft.picks.enemy.map((p) => p.hero)}
               portraits={portraits}
+              // Choosing my own hero is the one place a win rate helps: is it
+              // strong at my rank before I lock it in?
+              wins={wins}
             />
             {draft.myHero && (
               <p className="flex items-center gap-2 font-display text-lg">
@@ -651,6 +657,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
                   {draft.myHero}{' '}
                   <span className="text-muted-foreground">({draft.myLane.toUpperCase()})</span>
                 </span>
+                {wins[draft.myHero] != null && <WinRate win={wins[draft.myHero]} />}
               </p>
             )}
           </div>
@@ -688,6 +695,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         pool={pool}
         onChange={setPool}
         portraits={portraits}
+        wins={wins}
       />
     </LangProvider>
   );

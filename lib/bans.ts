@@ -45,3 +45,7 @@ export const banReason = (
   m: MetaHero,
   say: (win: number, ban: number) => string = (win, ban) => `${win}% win, ${ban}% banned`,
 ) => say(Math.round(m.win * 100), Math.round(m.ban * 100));
+
+/** Win rate by hero name, for showing beside a hero wherever it is chosen. */
+export const winsBy = (meta: MetaHero[]): Record<string, number> =>
+  Object.fromEntries(meta.map((m) => [m.hero, m.win]));

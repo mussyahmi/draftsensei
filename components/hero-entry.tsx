@@ -7,6 +7,7 @@ import { GameImage } from '@/components/game-image';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useT } from '@/components/lang';
+import { WinRate } from '@/components/win-rate';
 
 type Props = {
   onChoose: (hero: string) => void;
@@ -16,6 +17,8 @@ type Props = {
   className?: string;
   // Portraits by hero name, shown beside each match.
   portraits?: Record<string, string | null>;
+  // Win rates by hero name at the player's rank, shown beside each match.
+  wins?: Record<string, number>;
 };
 
 const MAX = 6;
@@ -27,6 +30,7 @@ export function HeroEntry({
   autoFocus,
   className,
   portraits = {},
+  wins,
 }: Props) {
   const t = useT();
   const [query, setQuery] = useState('');
@@ -100,6 +104,9 @@ export function HeroEntry({
                   <span className="size-7 shrink-0 rounded-full bg-muted" />
                 )}
                 {hero}
+                {wins?.[hero] != null && (
+                  <WinRate win={wins[hero]} plain={i === cursor} className="ms-auto" />
+                )}
               </button>
             </li>
           ))}

@@ -1,5 +1,5 @@
 import { test, expect, vi, afterEach } from 'vitest';
-import { banReason, metaFrom, suggestBans } from '../lib/bans';
+import { banReason, metaFrom, suggestBans, winsBy } from '../lib/bans';
 import { GET } from '../app/api/bans/route';
 import { forgetArena } from '../lib/arena';
 
@@ -81,4 +81,12 @@ test('the data source being down means no suggestions, not an error', async () =
   const res = await GET(new Request('http://x/api/bans'));
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual([]);
+});
+
+test('win rates are looked up by hero name', () => {
+  const wins = winsBy([
+    { hero: 'Nana', win: 0.53, ban: 0.1 },
+    { hero: 'Layla', win: 0.48, ban: 0 },
+  ]);
+  expect(wins).toEqual({ Nana: 0.53, Layla: 0.48 });
 });
