@@ -6,6 +6,20 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.5.1] - 2026-11-02
+
+### Added
+- What DraftSensei is for, in one line above the how-to steps.
+
+### Changed
+- The instant build has all 6 items in buying order, boots included: the
+  Academy's winning core items, topped up with the items most players' own
+  builds for that hero agree on.
+
+### Fixed
+- The rank dropdown uses the app's own arrow.
+- A newly picked hero always gets a fresh build, never an old saved one.
+
 ## [0.5.0] - 2026-11-02
 
 ### Added

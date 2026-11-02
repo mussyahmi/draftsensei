@@ -61,3 +61,51 @@ export function buildLines(builds: Build[]) {
       .toLowerCase(),
   );
 }
+
+// Shoes go in every build exactly once, whatever they are called.
+const isBoots = (name: string) => /boots|shoes/i.test(name);
+
+/**
+ * Six items in buying order: the Academy's core items, which have real win
+ * rates behind them, topped up with the items players' own builds for this
+ * hero agree on most. An item in only one of those builds is one player's
+ * idea, not agreement, so it never makes the cut.
+ */
+export function fullBuild(core: string[], community: string[][], size = 6): string[] {
+  const seen = new Map<string, { count: number; at: number }>();
+  for (const build of community) {
+    [...new Set(build)].forEach((item, i) => {
+      const s = seen.get(item) ?? { count: 0, at: 0 };
+      seen.set(item, { count: s.count + 1, at: s.at + i / Math.max(build.length - 1, 1) });
+    });
+  }
+  const where = (item: string, fallback: number) => {
+    const s = seen.get(item);
+    return s ? s.at / s.count : fallback;
+  };
+
+  const chosen = [...new Set(core)];
+  // Players split between kinds of boots, so no one pair may top the count,
+  // yet every build needs some: take the kind most of them buy.
+  if (!chosen.some(isBoots)) {
+    const shoes = [...seen].filter(([item]) => isBoots(item)).sort(([, a], [, b]) => b.count - a.count)[0];
+    if (shoes) chosen.unshift(shoes[0]);
+  }
+  let boots = chosen.some(isBoots);
+  const extras = [...seen]
+    .filter(([item, s]) => s.count >= 2 && !chosen.includes(item))
+    .sort(([, a], [, b]) => b.count - a.count || a.at / a.count - b.at / b.count);
+  for (const [item] of extras) {
+    if (chosen.length >= size) break;
+    if (isBoots(item)) {
+      if (boots) continue;
+      boots = true;
+    }
+    chosen.push(item);
+  }
+  // Core items players never list keep the Academy's own order, mid build.
+  return chosen
+    .map((item, i) => ({ item, at: where(item, 0.3 + i * 0.1) }))
+    .sort((a, b) => a.at - b.at)
+    .map((x) => x.item);
+}

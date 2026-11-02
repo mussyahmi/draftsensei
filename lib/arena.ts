@@ -203,6 +203,30 @@ export async function loadBuilds(
   );
 }
 
+type Community = { data: { data: { equips?: { equip_ids?: number[] }[] } } };
+
+// The builds players share for a hero in the Academy, as item names. Each is
+// one player's idea; what they agree on is what counts.
+export async function loadCommunity(hero: string, now = Date.now()): Promise<string[][]> {
+  const [names, catalog] = await Promise.all([loadHeroIds(now), loadCatalog(now)]);
+  const id = [...names].find(([, name]) => squash(name) === squash(hero))?.[0];
+  if (id === undefined) throw new Error(`arena does not know ${hero}`);
+  return remember(
+    `community:${id}`,
+    () =>
+      get<Page<Community>>(`/academy/heroes/${id}/recommended?size=20`).then((page) =>
+        (page.data?.records ?? [])
+          .map((r) =>
+            (r.data?.data?.equips?.[0]?.equip_ids ?? []).flatMap((e) =>
+              catalog.ids.has(e) ? [catalog.ids.get(e)!] : [],
+            ),
+          )
+          .filter((items) => items.length >= 3),
+      ),
+    now,
+  );
+}
+
 // Every hero's win and ban rate over the last week at this rank, strongest
 // first, for ban suggestions.
 export const loadMeta = (rank: Rank = 'all', now = Date.now()): Promise<MetaHero[]> =>

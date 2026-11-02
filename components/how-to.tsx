@@ -8,6 +8,8 @@ export function HowTo() {
   const t = useT();
   return (
     <div className="space-y-3 rounded-md bg-card/80 p-4">
+      {/* What it is for comes first: the steps make sense once you know. */}
+      <p className="font-medium">{t.purpose}</p>
       <ol className="space-y-2">
         {t.howTo.map((step, i) => (
           <li key={step} className="flex items-start gap-3 text-sm">

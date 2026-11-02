@@ -28,6 +28,7 @@ const en = {
   suggestHeroes: 'Suggest heroes',
   suggestBuild: 'Suggest build',
 
+  purpose: 'DraftSensei helps you through the MLBB draft: who to ban, which hero to pick for your lane, and how to build it.',
   howTo: [
     "Choose your lane and rank below. They're remembered.",
     "Type each hero as it's picked in game. Suggestions update as you go.",
@@ -45,8 +46,8 @@ const en = {
   unban: (hero: string) => `Unban ${hero}`,
 
   bestForLane: 'Best for your lane right now, tap to pick',
-  topBuild: (win: number) => `Top build in ranked games, ${win}% win. Suggest build adds the rest for this enemy team.`,
-  coreItems: 'Core items',
+  topBuild: (win: number) => `Top build in ranked games, ${win}% win. Suggest build fits it to this enemy team.`,
+  buildItems: 'Items in buying order',
   pickHero: (hero: string) => `Pick ${hero}`,
   // How an instant pick's reason reads: "+1.2% win vs Layla, +3.6% with Kaja".
   reasonWords: { win: 'win', with: 'with' },
@@ -111,6 +112,7 @@ const ms: Strings = {
   suggestHeroes: 'Cadangkan hero',
   suggestBuild: 'Cadangkan binaan',
 
+  purpose: 'DraftSensei membantu anda semasa draf MLBB: hero mana untuk disekat, hero mana untuk dipilih bagi lorong anda, dan cara membinanya.',
   howTo: [
     'Pilih lorong dan pangkat anda di bawah. Ia akan diingati.',
     'Taip setiap hero sebaik sahaja ia dipilih dalam permainan. Cadangan dikemas kini serta-merta.',
@@ -128,8 +130,8 @@ const ms: Strings = {
   unban: (hero) => `Batal sekatan ${hero}`,
 
   bestForLane: 'Terbaik untuk lorong anda sekarang, ketik untuk memilih',
-  topBuild: (win) => `Binaan terbaik dalam perlawanan ranked, ${win}% menang. Cadangkan binaan melengkapkannya untuk pasukan musuh ini.`,
-  coreItems: 'Item teras',
+  topBuild: (win) => `Binaan terbaik dalam perlawanan ranked, ${win}% menang. Cadangkan binaan menyesuaikannya dengan pasukan musuh ini.`,
+  buildItems: 'Item ikut urutan beli',
   pickHero: (hero) => `Pilih ${hero}`,
   reasonWords: { win: 'menang', with: 'bersama' },
 

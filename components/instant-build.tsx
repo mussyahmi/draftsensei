@@ -39,14 +39,14 @@ export function InstantBuild({ top }: { top: TopBuild }) {
       </ul>
       {build.items.length > 0 && (
         <>
-          <p className="pt-1 text-xs text-muted-foreground">{t.coreItems}</p>
-          <ol className="grid max-w-xs grid-cols-3 gap-2">
+          <p className="pt-1 text-xs text-muted-foreground">{t.buildItems}</p>
+          <ol className="grid grid-cols-6 gap-2">
             {build.items.map((item) => (
               <li key={item} className="flex flex-col items-center gap-1 text-center">
                 {icons[item] ? (
-                  <GameImage src={icons[item]!} className="size-10" />
+                  <GameImage src={icons[item]!} className="size-10 sm:size-12" />
                 ) : (
-                  <span className="size-10 rounded-md bg-muted" />
+                  <span className="size-10 rounded-md bg-muted sm:size-12" />
                 )}
                 <span className="text-xs leading-tight">{item}</span>
               </li>
