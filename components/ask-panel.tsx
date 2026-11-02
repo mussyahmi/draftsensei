@@ -62,6 +62,8 @@ type Props = {
   baseline?: string[];
   // False when the page shows the answer its own way, as pick chips.
   showAnswer?: boolean;
+  // Why asking makes no sense yet, if it does not; the button waits.
+  blocked?: string | null;
 };
 
 // One phase's ask button with its answer underneath. The page has two: hero
@@ -76,6 +78,7 @@ export function AskPanel({
   onAsk,
   baseline,
   showAnswer = true,
+  blocked = null,
 }: Props) {
   const t = useT();
   const [showPrompt, setShowPrompt] = useState(false);
@@ -141,7 +144,7 @@ export function AskPanel({
       <div className="flex items-center gap-2">
         <Button
           onClick={onAsk}
-          disabled={loading}
+          disabled={loading || blocked !== null}
           size="lg"
           className="flex-1 font-display text-base uppercase tracking-wide"
         >
@@ -169,6 +172,8 @@ export function AskPanel({
           <Ellipsis className="size-4" />
         </Button>
       </div>
+
+      {blocked && <p className="text-xs text-muted-foreground">{blocked}</p>}
 
       {answer && showAnswer && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">

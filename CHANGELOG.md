@@ -6,6 +6,17 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.5.3] - 2026-11-02
+
+### Fixed
+- Build tips name a teammate under Help first, and an enemy under Ult on.
+
+### Changed
+- Suggest build waits until you have picked your hero, and says so.
+- The page scrolls to what comes next: to your build after you tap a
+  suggested hero, up to the hero chips when the AI has chosen, and to the
+  whole build when the AI has adjusted it.
+
 ## [0.5.2] - 2026-11-02
 
 ### Changed

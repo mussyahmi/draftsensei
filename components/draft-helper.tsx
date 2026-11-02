@@ -244,6 +244,27 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     };
   }, [hydrated, picks]);
 
+  // On a phone an answer lands out of sight: the AI's picks in the chips
+  // above the lists, the AI's build low under its button. Bring each into
+  // view when it arrives.
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const buildRef = useRef<HTMLDivElement>(null);
+  const buildSectionRef = useRef<HTMLElement>(null);
+  // Set when a hero chip is tapped: the build section comes into view, and
+  // again once its build has loaded, since only then is the page long
+  // enough to bring it to the top.
+  const showBuildNext = useRef(false);
+  const reveal = (el: HTMLElement | null) => {
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+  };
+  const pickFromChips = useCallback((hero: string) => {
+    setDraft((d) => ({ ...d, myHero: hero }));
+    // The hero is chosen; what comes next is its build.
+    showBuildNext.current = true;
+    requestAnimationFrame(() => reveal(buildSectionRef.current));
+  }, []);
+
   useEffect(() => {
     if (!draft.myHero) return;
     const key = `${draft.myHero}|${draft.myLane}|${draft.rank}`;
@@ -252,7 +273,12 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     fetch(`/api/builds?${params}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((top: TopBuild | null) => {
-        if (current) setTopBuild(top ? { ...top, for: key } : null);
+        if (!current) return;
+        setTopBuild(top ? { ...top, for: key } : null);
+        if (showBuildNext.current) {
+          showBuildNext.current = false;
+          requestAnimationFrame(() => reveal(buildSectionRef.current));
+        }
       })
       .catch(() => {
         /* no instant build; Suggest build still works */
@@ -264,6 +290,16 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
   // What goes along with the prompt: the board as names for hero picks, my
   // hero and lane for a build, so the server can look up real stats.
+  const pickAnswer = answers.pick;
+  const buildAnswer = answers.build;
+  useEffect(() => {
+    if (pickAnswer) reveal(chipsRef.current);
+  }, [pickAnswer]);
+  useEffect(() => {
+    if (buildAnswer) reveal(buildRef.current);
+  }, [buildAnswer]);
+
+
   const ask = useCallback(async (phase: Phase, asking: string, extra: object) => {
     const fail = (message: Say) => setErrors(forPhase<Say | null>(phase, message));
     setLoading(forPhase(phase, true));
@@ -528,15 +564,17 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         <section className="space-y-6 border-t border-border pt-8">
           <PhaseTitle n={2}>{t.picks}</PhaseTitle>
           {/* Above the lists, so a new pick never pushes them out of sight. */}
-          {!draft.myHero && (
-            <PickSuggestions
-              // An emptied board keeps no stale picks from before.
-              ranked={picks.enemy.length || picks.team.length ? instant : []}
-              ai={aiPicks}
-              portraits={portraits}
-              onPick={(hero) => setDraft((d) => ({ ...d, myHero: hero }))}
-            />
-          )}
+          <div ref={chipsRef} className="scroll-mt-4 empty:hidden">
+            {!draft.myHero && (
+              <PickSuggestions
+                // An emptied board keeps no stale picks from before.
+                ranked={picks.enemy.length || picks.team.length ? instant : []}
+                ai={aiPicks}
+                portraits={portraits}
+                onPick={pickFromChips}
+              />
+            )}
+          </div>
 
           <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2">
             {SIDES.map((side) => (
@@ -592,7 +630,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
           />
         </section>
 
-        <section className="space-y-6 border-t border-border pt-8">
+        <section ref={buildSectionRef} className="scroll-mt-4 space-y-6 border-t border-border pt-8">
           <PhaseTitle n={3}>{t.myBuild}</PhaseTitle>
           <div className="max-w-sm space-y-2">
             <h3 className="font-display text-sm uppercase tracking-widest text-primary">
@@ -621,16 +659,20 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
               for this enemy team, then the adjusted one in its place. */}
           {top && !adjusted && <InstantBuild top={top} />}
 
-          <AskPanel
-            label={top ? t.adjustBuild : t.suggestBuild}
-            baseline={top?.build.items}
-            prompt={prompts.build}
-            answer={answers.build}
-            loading={loading.build}
-            error={errors.build?.(t) ?? null}
-            portraits={portraits}
-            onAsk={askBuild}
-          />
+          <div ref={buildRef} className="scroll-mt-4">
+            <AskPanel
+              label={top ? t.adjustBuild : t.suggestBuild}
+              // A build is for a hero; without one there is nothing to ask.
+              blocked={draft.myHero ? null : t.pickHeroFirst}
+              baseline={top?.build.items}
+              prompt={prompts.build}
+              answer={answers.build}
+              loading={loading.build}
+              error={errors.build?.(t) ?? null}
+              portraits={portraits}
+              onAsk={askBuild}
+            />
+          </div>
         </section>
       </main>
 

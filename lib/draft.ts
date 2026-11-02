@@ -100,6 +100,11 @@ const BLESSINGS: Partial<Record<Lane, string>> = {
   jungle: 'jungle blessing',
 };
 
+// Gemini read "help first" as "deal with first" and named an enemy, so spell
+// out who each line is about.
+const ADVICE_MEANING =
+  'the first label names a teammate from my team to support first, the second an enemy hero to use my ultimate on';
+
 export function buildPrompt(draft: Draft) {
   const blessing = BLESSINGS[draft.myLane];
   return [
@@ -119,9 +124,10 @@ export function buildPrompt(draft: Draft) {
     ...(draft.lang === 'ms'
       ? [
           'then 3 short lines, each starting with its label: Bantu dahulu:, Ult pada:, Syarat menang:',
+          ADVICE_MEANING,
           'write in formal Malay (Bahasa Melayu); keep hero, item, spell and emblem names in English, and the labels Battle spell: and Emblem: as written',
         ]
-      : ['then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:']),
+      : ['then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:', ADVICE_MEANING]),
   ].join('\n');
 }
 

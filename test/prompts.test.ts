@@ -65,6 +65,7 @@ test('build prompt names my hero and lane and asks for the gameplay guide', () =
     '- order them by when to buy',
     '',
     'then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:',
+    'the first label names a teammate from my team to support first, the second an enemy hero to use my ultimate on',
   ].join('\n'));
 });
 
