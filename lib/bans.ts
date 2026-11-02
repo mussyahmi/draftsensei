@@ -41,5 +41,7 @@ export function suggestBans(meta: MetaHero[], taken: string[], count = BAN_SUGGE
 }
 
 // "58% win, 24% banned": whole numbers read faster mid-draft.
-export const banReason = (m: MetaHero) =>
-  `${Math.round(m.win * 100)}% win, ${Math.round(m.ban * 100)}% banned`;
+export const banReason = (
+  m: MetaHero,
+  say: (win: number, ban: number) => string = (win, ban) => `${win}% win, ${ban}% banned`,
+) => say(Math.round(m.win * 100), Math.round(m.ban * 100));

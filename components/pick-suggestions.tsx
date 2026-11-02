@@ -2,6 +2,7 @@
 
 import { GameImage } from '@/components/game-image';
 import { pickReason, type Ranked } from '@/lib/matchups';
+import { useT } from '@/components/lang';
 
 type Props = {
   ranked: Ranked[];
@@ -12,18 +13,19 @@ type Props = {
 // The best few heroes for my lane as the board stands, from match data
 // alone, so they show the moment a pick goes in. Tapping one makes it mine.
 export function PickSuggestions({ ranked, portraits, onPick }: Props) {
+  const t = useT();
   if (!ranked.length) return null;
   return (
     <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">Best for your lane right now, tap to pick</p>
+      <p className="text-xs text-muted-foreground">{t.bestForLane}</p>
       <div className="flex flex-wrap gap-1.5">
         {ranked.map((r) => {
-          const reason = pickReason(r);
+          const reason = pickReason(r, t.reasonWords);
           return (
             <button
               key={r.hero}
               type="button"
-              aria-label={`Pick ${r.hero}`}
+              aria-label={t.pickHero(r.hero)}
               onClick={() => onPick(r.hero)}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-dashed border-border py-0.5 ps-0.5 pe-3 text-sm hover:border-primary hover:bg-secondary"
             >

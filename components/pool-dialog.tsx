@@ -1,9 +1,10 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { LANES, RANKS, laneLabel, poolFor, type Lane, type Pool, type Rank } from '@/lib/draft';
+import { LANES, poolFor, type Lane, type Pool } from '@/lib/draft';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
+import { useT } from '@/components/lang';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,8 +21,6 @@ type Props = {
   pool: Pool;
   onChange: (pool: Pool) => void;
   portraits: Record<string, string | null>;
-  rank: Rank;
-  onRank: (rank: Rank) => void;
 };
 
 export function PoolDialog({
@@ -30,9 +29,8 @@ export function PoolDialog({
   pool,
   onChange,
   portraits,
-  rank,
-  onRank,
 }: Props) {
+  const t = useT();
   const add = (lane: Lane, hero: string) => {
     if (poolFor(pool, lane).includes(hero)) return;
     onChange({ ...pool, [lane]: [...poolFor(pool, lane), hero] });
@@ -46,37 +44,18 @@ export function PoolDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>My heroes</DialogTitle>
+          <DialogTitle>{t.myHeroes}</DialogTitle>
           <DialogDescription>
-            The heroes you actually play. When the lane you&apos;re on has a list here,
-            the answer only suggests from it.
+            {t.poolHint}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Set once: stats from players at your level fit you better than
-            all ranks mixed. */}
-        <label className="flex items-center justify-between gap-3">
-          <span className="font-display text-sm uppercase tracking-wide text-muted-foreground">
-            My rank
-          </span>
-          <select
-            value={rank}
-            onChange={(e) => onRank(e.target.value as Rank)}
-            className="h-10 rounded-lg border border-input bg-background/60 px-3 text-base sm:h-9 sm:text-sm"
-          >
-            {RANKS.map((r) => (
-              <option key={r.key} value={r.key}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </label>
 
         <div className="space-y-6">
           {LANES.map((lane) => (
             <div key={lane.key} className="space-y-2">
               <h3 className="font-display text-sm uppercase tracking-wide text-muted-foreground">
-                {laneLabel(lane.key)}
+                {lane.key.toUpperCase()}
               </h3>
               <HeroEntry
                 onChoose={(hero) => add(lane.key, hero)}
@@ -96,7 +75,7 @@ export function PoolDialog({
                       <span className={portraits[hero] ? '' : 'ps-1.5'}>{hero}</span>
                       <button
                         type="button"
-                        aria-label={`Remove ${hero}`}
+                        aria-label={t.remove(hero)}
                         onClick={() => drop(lane.key, hero)}
                         // Padding makes a thumb-sized target around a small cross.
                         className="rounded-full p-1.5 text-muted-foreground hover:text-destructive"
@@ -112,7 +91,7 @@ export function PoolDialog({
         </div>
 
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Done</Button>
+          <Button onClick={() => onOpenChange(false)}>{t.done}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

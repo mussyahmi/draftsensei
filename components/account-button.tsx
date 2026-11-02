@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useT } from '@/components/lang';
 
 type Props = {
   account: Account | null;
@@ -22,11 +23,12 @@ type Props = {
 };
 
 export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: Props) {
+  const t = useT();
   if (!account) {
     return (
       <Button variant="ghost" size="sm" onClick={onSignIn}>
         <LogIn className="size-3.5" />
-        Sign in
+        {t.signIn}
       </Button>
     );
   }
@@ -42,7 +44,7 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
           <Button
             variant="ghost"
             size="sm"
-            aria-label={account.email ?? 'Signed in'}
+            aria-label={account.email ?? t.signedIn}
             className="max-w-48"
           >
             {busy ? (
@@ -52,7 +54,7 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
             )}
             {/* A full email crowds the header off one row on a phone; there
                 the cloud alone says signed in, and the menu says as whom. */}
-            <span className="hidden truncate sm:inline">{account.email ?? 'Signed in'}</span>
+            <span className="hidden truncate sm:inline">{account.email ?? t.signedIn}</span>
           </Button>
         }
       />
@@ -65,7 +67,7 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
               <span className="text-destructive">{problem}</span>
             ) : (
               <span className="text-muted-foreground">
-                Saved to your account. Sign in on another device and your draft follows.
+                {t.savedToAccount}
               </span>
             )}
           </DropdownMenuLabel>
@@ -73,7 +75,7 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onSignOut}>
           <LogOut className="size-3.5" />
-          Sign out
+          {t.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HEROES } from '@/lib/heroes';
 import { searchHeroes } from '@/lib/draft';
 import { GameImage } from '@/components/game-image';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useT } from '@/components/lang';
 
 type Props = {
   onChoose: (hero: string) => void;
@@ -22,11 +23,12 @@ const MAX = 6;
 export function HeroEntry({
   onChoose,
   unavailable,
-  placeholder = 'Type a hero…',
+  placeholder,
   autoFocus,
   className,
   portraits = {},
 }: Props) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const input = useRef<HTMLElement>(null);
@@ -40,15 +42,20 @@ export function HeroEntry({
     input.current?.focus();
   };
 
+  // Focus is a head start with a keyboard and mouse. On a phone it pops the
+  // on-screen keyboard over half the page before anything has been read.
+  useEffect(() => {
+    if (autoFocus && window.matchMedia('(pointer: fine)').matches) input.current?.focus();
+  }, [autoFocus]);
+
   return (
     <div className={cn('relative', className)}>
       <Input
         ref={input}
         value={query}
-        autoFocus={autoFocus}
         autoComplete="off"
         spellCheck={false}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t.typeHero}
         onValueChange={(next) => {
           setQuery(next);
           setCursor(0);

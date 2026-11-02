@@ -64,7 +64,13 @@ test('a losing lane matchup gives way to the best counter', () => {
   expect(pickReason({ ...ranked, opponent: { enemy: 'Layla', gain: -0.01 } })).toBe('+3.1% win vs Sun');
 });
 
-test('with no counter, the reason is how it fits the team', () => {
-  expect(pickReason({ ...ranked, best: null })).toBe('+1.0% win with team');
-  expect(pickReason({ ...ranked, best: null, alongside: -0.01 })).toBeNull();
+test('a pick there for a combo names the teammate too', () => {
+  expect(pickReason({ ...ranked, partner: { ally: 'Kaja', gain: 0.036 } }))
+    .toBe('+3.1% win vs Sun, +3.6% with Kaja');
+});
+
+test('with no counter, the reason is the teammate alone', () => {
+  expect(pickReason({ ...ranked, best: null, partner: { ally: 'Kaja', gain: 0.036 } }))
+    .toBe('+3.6% win with Kaja');
+  expect(pickReason({ ...ranked, best: null, partner: null })).toBeNull();
 });

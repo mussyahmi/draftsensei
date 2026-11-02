@@ -1,3 +1,5 @@
+import type { Lang } from './i18n';
+
 export type Lane = 'exp' | 'mid' | 'jungle' | 'gold' | 'roam';
 
 export type Side = 'team' | 'enemy';
@@ -26,6 +28,9 @@ export type Draft = {
   // Heroes banned by either team; nobody can pick them.
   bans: string[];
   rank: Rank;
+  // The page's language, set once like the rank and kept with the draft so
+  // it follows the account to another device.
+  lang: Lang;
 };
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -81,6 +86,7 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
     ...(draft.bans.length ? [`banned: ${draft.bans.map((h) => h.toLowerCase()).join(', ')}`, ''] : []),
     'answer with hero names, each with a reason of 6 words max',
     'do not suggest a hero already picked by either team',
+    ...(draft.lang === 'ms' ? ['write the reasons in formal Malay (Bahasa Melayu), hero names in English'] : []),
     ...(mine.length
       ? ['', `only suggest from my heroes: ${mine.map((h) => h.toLowerCase()).join(', ')}`]
       : []),
@@ -110,7 +116,12 @@ export function buildPrompt(draft: Draft) {
     '- order them by when to buy',
     ...(blessing ? [`- boots first, and name which ${blessing} to put on them`] : []),
     '',
-    'then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:',
+    ...(draft.lang === 'ms'
+      ? [
+          'then 3 short lines, each starting with its label: Bantu dahulu:, Ult pada:, Syarat menang:',
+          'write in formal Malay (Bahasa Melayu); keep hero, item, spell and emblem names in English, and the labels Battle spell: and Emblem: as written',
+        ]
+      : ['then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:']),
   ].join('\n');
 }
 
@@ -120,6 +131,7 @@ export const newDraft = (): Draft => ({
   myHero: '',
   bans: [],
   rank: 'all',
+  lang: 'en',
 });
 
 export function takenHeroes(draft: Draft) {

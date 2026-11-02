@@ -9,30 +9,31 @@ const withTigreal: Gains = new Map([['Saber', 0.02], ['Natan', 0.01]]);
 const enemies = new Map([['Sun', vsSun], ['Eudora', vsEudora]]);
 
 test('picks rank by win rate gained against the enemy plus with my team', () => {
-  const ranked = rankPicks(['Jawhead', 'Saber', 'Natan'], enemies, [withTigreal]);
+  const ranked = rankPicks(['Jawhead', 'Saber', 'Natan'], enemies, new Map([['Tigreal', withTigreal]]));
   expect(ranked.map((r) => r.hero)).toEqual(['Saber', 'Jawhead', 'Natan']);
   expect(ranked[0]).toEqual({
     hero: 'Saber',
     against: 0.051,
     alongside: 0.02,
     best: { enemy: 'Sun', gain: 0.031 },
+    partner: { ally: 'Tigreal', gain: 0.02 },
     opponent: null,
   });
 });
 
 test('each pick names the enemy it does best into, or none if it gains on nobody', () => {
-  const ranked = rankPicks(['Jawhead', 'Natan'], enemies, []);
+  const ranked = rankPicks(['Jawhead', 'Natan'], enemies, new Map());
   expect(ranked.find((r) => r.hero === 'Jawhead')?.best).toEqual({ enemy: 'Sun', gain: 0.039 });
   expect(ranked.find((r) => r.hero === 'Natan')?.best).toBeNull();
 });
 
 test('a hero missing from one table counts as no change there', () => {
-  const [only] = rankPicks(['Jawhead'], new Map([['Sun', vsSun]]), [withTigreal]);
+  const [only] = rankPicks(['Jawhead'], new Map([['Sun', vsSun]]), new Map([['Tigreal', withTigreal]]));
   expect(only).toMatchObject({ hero: 'Jawhead', against: 0.039, alongside: 0 });
 });
 
 test('a hero with no data at all is left out rather than shown as neutral', () => {
-  expect(rankPicks(['Layla', 'Saber'], new Map([['Sun', vsSun]]), [withTigreal]).map((r) => r.hero))
+  expect(rankPicks(['Layla', 'Saber'], new Map([['Sun', vsSun]]), new Map([['Tigreal', withTigreal]])).map((r) => r.hero))
     .toEqual(['Saber']);
 });
 
@@ -66,7 +67,7 @@ test('the enemy in my lane counts double, and is named on the line', () => {
   // the enemy in my lane, so Saber ranks first.
   const vsSun2: Gains = new Map([['Jawhead', 0.03], ['Saber', 0.01]]);
   const vsEudora2: Gains = new Map([['Jawhead', 0.0], ['Saber', 0.02]]);
-  const ranked = rankPicks(['Jawhead', 'Saber'], new Map([['Sun', vsSun2], ['Eudora', vsEudora2]]), [], 'Eudora');
+  const ranked = rankPicks(['Jawhead', 'Saber'], new Map([['Sun', vsSun2], ['Eudora', vsEudora2]]), new Map(), 'Eudora');
   expect(ranked.map((r) => r.hero)).toEqual(['Saber', 'Jawhead']);
   expect(ranked[0].opponent).toEqual({ enemy: 'Eudora', gain: 0.02 });
   expect(matchupLines([ranked[0]], false)).toEqual([
@@ -75,7 +76,7 @@ test('the enemy in my lane counts double, and is named on the line', () => {
 });
 
 test('with no enemy in my lane yet, nobody is weighted', () => {
-  const [r] = rankPicks(['Saber'], new Map([['Sun', vsSun]]), [], undefined);
+  const [r] = rankPicks(['Saber'], new Map([['Sun', vsSun]]), new Map(), undefined);
   expect(r.opponent).toBeNull();
 });
 

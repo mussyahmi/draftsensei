@@ -92,3 +92,14 @@ test('match stats are asked for at my rank', async () => {
   await loadGains('Sun', 'counters', 'glory', 0);
   expect(seen).toContain('https://arena.rone.dev/api/academy/heroes/27/counters?rank=glory');
 });
+
+test('a rate limit reported in the body is not kept as an empty catalog', async () => {
+  let calls = 0;
+  vi.stubGlobal('fetch', async () => {
+    calls++;
+    return new Response(JSON.stringify({ status: 'error', code: 'UPSTREAM_RATE_LIMITED' }));
+  });
+  await expect(loadCatalog(0)).rejects.toThrow('UPSTREAM_RATE_LIMITED');
+  await expect(loadCatalog(1)).rejects.toThrow();
+  expect(calls).toBeGreaterThan(3);
+});

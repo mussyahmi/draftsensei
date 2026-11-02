@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { buildsFrom, buildLines, type Build } from '../lib/builds';
+import { buildsFrom, buildLines, emblemName, type Build } from '../lib/builds';
 
 const items = new Map([[1, 'Flask of the Oasis'], [2, 'Glowing Wand'], [3, 'Enchanted Talisman'], [4, 'Fleeting Time']]);
 const talents = new Map([[611, 'Inspire'], [621, 'Bargain Hunter'], [831, 'Focusing Mark']]);
@@ -35,4 +35,9 @@ test('the prompt lines read as a short ranked list', () => {
   expect(buildLines([b])).toEqual([
     '56.9% win, 12.9% pick: flicker, support emblem (inspire, bargain hunter, focusing mark), core items flask of the oasis, glowing wand, enchanted talisman',
   ]);
+});
+
+test('the Academy\'s "All" emblem is called Common, as in the game', () => {
+  expect(emblemName('All')).toBe('Common');
+  expect(emblemName('Mage')).toBe('Mage');
 });

@@ -6,6 +6,41 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.5.0] - 2026-11-02
+
+### Added
+- Instant build: as soon as you pick your hero, the build that wins most in
+  ranked games shows with its spell, emblem, talents and core items. Suggest
+  build still adds the rest for the enemy team. It shows only when that
+  build is played in at least 5% of games, so a lucky rare build never does.
+- Bahasa Melayu: an EN | BM switch at the top, remembered and kept with your
+  account. A phone set to Malay starts in Malay, and Gemini answers in Malay
+  too. Hero, item and lane names stay as the game writes them.
+- A tip under the steps: DraftSensei works best on a second screen beside
+  the phone you play on.
+- How to use, in 3 steps, shown on an empty draft and gone once you start.
+- The ✕ is back on your own row under team picks, to clear your hero.
+
+### Changed
+- The page follows the game's draft: your lane and rank first, then 1 Bans,
+  2 Picks and 3 Build. Once all 10 bans are in, they fold to one row.
+- On a phone, ban suggestions are shorter so two fit on a line, and the
+  keyboard no longer pops up when the page opens.
+- Show prompt is now a small ⋯ button, and the asks counter only shows once
+  the day's shared asks run low.
+- Your lane and rank sit together at the top of Picks, instead of one in the
+  header and one inside My heroes.
+- Instant picks sit above the team lists, so new picks never push them out
+  of sight.
+- Instant picks name the teammate a hero combos with best, as in
+  "+1.2% win vs Layla, +3.6% with Kaja", and Suggest heroes can give a combo
+  as its reason too.
+
+### Fixed
+- The Common emblem is called Common, with its icon, instead of "All".
+- Builds get their item icons back after the data source has been busy,
+  instead of going without them for hours.
+
 ## [0.4.0] - 2026-11-02
 
 ### Added

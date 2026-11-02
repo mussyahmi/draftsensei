@@ -1,11 +1,12 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { laneClashes, laneLabel, type Lane, type Pick } from '@/lib/draft';
+import { laneClashes, type Lane, type Pick } from '@/lib/draft';
 import { GameImage } from '@/components/game-image';
 import { LaneMenu } from '@/components/lane-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useT } from '@/components/lang';
 
 type Props = {
   picks: Pick[];
@@ -13,14 +14,15 @@ type Props = {
   onRemove: (index: number) => void;
   side: 'team' | 'enemy';
   portraits: Record<string, string | null>;
-  // The hero I said I am playing, shown last on my team. Read only here: the
-  // lane is set in the header and the hero under My build.
+  // The hero I said I am playing, shown last on my team. Its lane is set in
+  // the header, so here it can only be cleared.
   me?: { hero: string; lane: Lane };
+  onClearMe?: () => void;
 };
 
 type Row = { hero: string; lane: Lane; me: boolean; onLane?: (lane: Lane) => void; onRemove?: () => void };
 
-export function PickList({ picks, onLane, onRemove, side, portraits, me }: Props) {
+export function PickList({ picks, onLane, onRemove, side, portraits, me, onClearMe }: Props) {
   const rows: Row[] = [
     ...picks.map((p, i) => ({
       hero: p.hero,
@@ -29,10 +31,16 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me }: Props
       // rather than show the hero twice.
       me: p.hero === me?.hero,
       onLane: (lane: Lane) => onLane(i, lane),
-      onRemove: () => onRemove(i),
+      // Removing my own hero here clears it as mine too, or it would come
+      // straight back as its own row.
+      onRemove: () => {
+        onRemove(i);
+        if (p.hero === me?.hero) onClearMe?.();
+      },
     })),
-    ...(me && !picks.some((p) => p.hero === me.hero) ? [{ ...me, me: true }] : []),
+    ...(me && !picks.some((p) => p.hero === me.hero) ? [{ ...me, me: true, onRemove: onClearMe }] : []),
   ];
+  const t = useT();
   // My own hero counts: two of us in one lane is as wrong as two teammates.
   const clashes = laneClashes(rows);
 
@@ -40,12 +48,12 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me }: Props
     <div className="space-y-2">
       {clashes.length > 0 && (
         <p className="text-sm font-medium text-primary">
-          Two heroes in {clashes.map(laneLabel).join(' and ')}. Fix the lane.
+          {t.clash(clashes.map((l) => l.toUpperCase()))}
         </p>
       )}
 
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No picks yet.</p>
+        <p className="text-sm text-muted-foreground">{t.noPicks}</p>
       ) : (
         <ol className="space-y-1.5">
           {rows.map((pick, i) => (
@@ -68,7 +76,7 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me }: Props
                 {pick.hero}
                 {pick.me && (
                   <span className="ms-1.5 rounded bg-primary px-1.5 py-0.5 align-middle font-sans text-xs font-semibold uppercase text-primary-foreground">
-                    you
+                    {t.you}
                   </span>
                 )}
               </span>
@@ -84,8 +92,8 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me }: Props
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Remove ${pick.hero}`}
-                  title={`Remove ${pick.hero}`}
+                  aria-label={t.remove(pick.hero)}
+                  title={t.remove(pick.hero)}
                   onClick={pick.onRemove}
                   className="size-8 shrink-0 text-muted-foreground hover:text-destructive sm:size-6"
                 >

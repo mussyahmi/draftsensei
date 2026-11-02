@@ -1,5 +1,5 @@
 import { metaFrom, type MetaHero, type RankPage } from './bans';
-import { buildsFrom, type Build, type BuildPage } from './builds';
+import { buildsFrom, emblemName, type Build, type BuildPage } from './builds';
 import type { Lane, Rank } from './draft';
 
 // Rone Arena is a community API over Moonton's own MLBB Academy data, so its
@@ -43,10 +43,10 @@ export function catalogFrom(
     items.push(name);
     if (typeof data.equipid === 'number') ids.set(data.equipid, name);
   }
-  // Emblems are listed with the roles; "All" is not one you pick.
+  // Emblems are listed with the roles, the Common one as "All".
   for (const { data } of roles.data?.records ?? []) {
     const name = data.emblem_title?.trim();
-    if (name && name !== 'All') icons.set(name, data.emblem_icon || null);
+    if (name) icons.set(emblemName(name), data.emblem_icon || null);
   }
   for (const { data } of spells.data?.records ?? []) {
     const name = data.__data?.skillname?.trim();
@@ -73,7 +73,11 @@ async function get<T>(path: string): Promise<T> {
     signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`arena answered ${response.status}`);
-  return response.json();
+  // When the Academy behind it rate-limits, Rone can say so in the body, and
+  // an empty answer kept for hours would leave builds without icons.
+  const body = await response.json();
+  if (body?.status === 'error') throw new Error(`arena: ${body.code ?? 'error'}`);
+  return body;
 }
 
 // The shop changes once a patch and the match stats once a day, so one fetch

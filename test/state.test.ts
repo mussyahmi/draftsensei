@@ -9,6 +9,7 @@ test('a new draft starts empty with mid lane, no bans and all ranks', () => {
     myHero: '',
     bans: [],
     rank: 'all',
+    lang: 'en',
   });
 });
 
@@ -19,6 +20,7 @@ test('taken heroes covers picks on both sides, my own hero and bans', () => {
     myHero: 'Rafaela',
     bans: ['Ling'],
     rank: 'all',
+    lang: 'en',
   };
   expect(takenHeroes(draft).sort()).toEqual(['Ling', 'Marcel', 'Masha', 'Rafaela']);
 });

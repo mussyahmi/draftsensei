@@ -16,6 +16,8 @@ export type Ranked = {
   against: number;
   alongside: number;
   best: { enemy: string; gain: number } | null;
+  // The teammate it plays best beside, for the same reason.
+  partner?: { ally: string; gain: number } | null;
   // How it does into the enemy in my lane, the matchup that decides the lane.
   opponent?: { enemy: string; gain: number } | null;
 };
@@ -47,11 +49,12 @@ const sum = (tables: Gains[], hero: string) =>
 export function rankPicks(
   candidates: string[],
   against: Map<string, Gains>,
-  alongside: Gains[],
+  alongside: Map<string, Gains>,
   opponent?: string,
 ): Ranked[] {
   const enemies = [...against.values()];
-  const tables = [...enemies, ...alongside];
+  const allies = [...alongside.values()];
+  const tables = [...enemies, ...allies];
   const lane = opponent ? against.get(opponent) : undefined;
   const score = (r: Ranked) => r.against + r.alongside + (r.opponent?.gain ?? 0);
   return candidates
@@ -59,21 +62,33 @@ export function rankPicks(
     .map((hero) => ({
       hero,
       against: sum(enemies, hero),
-      alongside: sum(alongside, hero),
+      alongside: sum(allies, hero),
       best: bestInto(against, hero),
+      partner: bestWith(alongside, hero),
       opponent: lane && opponent ? { enemy: opponent, gain: lane.get(hero) ?? 0 } : null,
     }))
     .sort((a, b) => score(b) - score(a));
 }
 
-// Only a real gain counts as a counter; doing least badly into someone is not.
-function bestInto(against: Map<string, Gains>, hero: string): Ranked['best'] {
-  let best: Ranked['best'] = null;
-  for (const [enemy, table] of against) {
+// Only a real gain counts as a counter or a partner; doing least badly
+// beside or into someone is not.
+function strongest(tables: Map<string, Gains>, hero: string) {
+  let top: { name: string; gain: number } | null = null;
+  for (const [name, table] of tables) {
     const gain = table.get(hero) ?? 0;
-    if (gain > 0 && (!best || gain > best.gain)) best = { enemy, gain };
+    if (gain > 0 && (!top || gain > top.gain)) top = { name, gain };
   }
-  return best;
+  return top;
+}
+
+function bestInto(against: Map<string, Gains>, hero: string): Ranked['best'] {
+  const top = strongest(against, hero);
+  return top && { enemy: top.name, gain: top.gain };
+}
+
+function bestWith(alongside: Map<string, Gains>, hero: string): Ranked['partner'] {
+  const top = strongest(alongside, hero);
+  return top && { ally: top.name, gain: top.gain };
 }
 
 const percent = (n: number) => `${n < 0 ? '-' : '+'}${Math.abs(n * 100).toFixed(1)}%`;
@@ -84,7 +99,8 @@ export function matchupLines(ranked: Ranked[], withTeam: boolean) {
       `${r.hero.toLowerCase()}: ${percent(r.against)} vs enemy` +
       (r.best ? ` (best into ${r.best.enemy.toLowerCase()} ${percent(r.best.gain)})` : '') +
       (r.opponent ? `, vs lane opponent ${r.opponent.enemy.toLowerCase()} ${percent(r.opponent.gain)}` : '') +
-      (withTeam ? `, ${percent(r.alongside)} with my team` : ''),
+      (withTeam ? `, ${percent(r.alongside)} with my team` : '') +
+      (withTeam && r.partner ? ` (best with ${r.partner.ally.toLowerCase()} ${percent(r.partner.gain)})` : ''),
   );
 }
 
@@ -154,7 +170,7 @@ export async function rankedFor(
   const ranked = rankPicks(
     candidates,
     new Map(against),
-    alongside.map(([, gains]) => gains),
+    new Map(alongside),
     picks.opponent,
   ).slice(0, count);
   return { ranked, withTeam: alongside.length > 0 };
@@ -165,13 +181,22 @@ export async function matchupData(picks: Picks): Promise<string[]> {
   return matchupLines(ranked, withTeam);
 }
 
-// The one line on an instant pick, as how much more often it wins: its
-// biggest win into an enemy, the lane opponent on a tie since that is the
-// fight it takes most; failing any, how it fits my team.
-export function pickReason(r: Ranked): string | null {
+// The line on an instant pick, as how much more often it wins: its biggest
+// win into an enemy (the lane opponent on a tie, since that is the fight it
+// takes most), and the teammate it plays best beside, so a pick that is there
+// for a combo says so.
+export function pickReason(
+  r: Ranked,
+  words: { win: string; with: string } = { win: 'win', with: 'with' },
+): string | null {
   const lane = r.opponent && r.opponent.gain > 0 ? r.opponent : null;
   const into = lane && (!r.best || lane.gain >= r.best.gain) ? lane : r.best;
-  if (into) return `${percent(into.gain)} win vs ${into.enemy}`;
-  if (r.alongside > 0) return `${percent(r.alongside)} win with team`;
-  return null;
+  const parts = [
+    into && [percent(into.gain), `vs ${into.enemy}`],
+    r.partner && [percent(r.partner.gain), `${words.with} ${r.partner.ally}`],
+  ].filter((p): p is string[] => Boolean(p));
+  // "+1.2% win vs Layla, +3.6% with Kaja": "win" once, on the first number.
+  return parts.length
+    ? parts.map(([n, who], i) => (i === 0 ? `${n} ${words.win} ${who}` : `${n} ${who}`)).join(', ')
+    : null;
 }

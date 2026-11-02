@@ -4,6 +4,8 @@ import { X } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
 import { banReason, suggestBans, type MetaHero } from '@/lib/bans';
+import { useT } from '@/components/lang';
+import { cn } from '@/lib/utils';
 
 type Props = {
   bans: string[];
@@ -18,19 +20,17 @@ type Props = {
 // Both teams' bans in one list: entering them is optional, and when it is
 // done, suggestions skip them. Ten at most, five a side.
 export function BanList({ bans, unavailable, portraits, meta, onChange }: Props) {
-  const suggested = bans.length < 10 ? suggestBans(meta, unavailable) : [];
+  const t = useT();
+  const full = bans.length >= 10;
+  const suggested = full ? [] : suggestBans(meta, unavailable);
   return (
     <div className="space-y-2">
-      <h3 className="font-display text-sm uppercase tracking-widest text-muted-foreground">
-        Bans <span>{bans.length} / 10</span>
-        <span className="ms-2 font-sans text-xs normal-case tracking-normal">optional</span>
-      </h3>
       {bans.length < 10 && (
         <HeroEntry
           onChoose={(hero) => onChange([...bans, hero])}
           unavailable={unavailable}
           portraits={portraits}
-          placeholder="Ban a hero…"
+          placeholder={t.banHero}
         />
       )}
       {bans.length > 0 && (
@@ -43,12 +43,20 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
               {portraits[hero] && (
                 <GameImage src={portraits[hero]!} className="size-6 rounded-full grayscale" />
               )}
-              <span className={portraits[hero] ? 'line-through decoration-1' : 'ps-1.5 line-through decoration-1'}>
+              {/* All ten in: on a phone the faces alone, so the finished
+                  bans take one line and the picks move up. */}
+              <span
+                className={cn(
+                  'line-through decoration-1',
+                  !portraits[hero] && 'ps-1.5',
+                  full && portraits[hero] && 'hidden sm:inline',
+                )}
+              >
                 {hero}
               </span>
               <button
                 type="button"
-                aria-label={`Unban ${hero}`}
+                aria-label={t.unban(hero)}
                 onClick={() => onChange(bans.filter((b) => b !== hero))}
                 className="rounded-full p-1.5 text-muted-foreground hover:text-destructive"
               >
@@ -61,13 +69,13 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
       {/* No asking needed: the strongest heroes this week, one tap each. */}
       {suggested.length > 0 && (
         <div className="space-y-2 pt-2">
-          <p className="text-xs text-muted-foreground">Strongest this week, tap to ban</p>
+          <p className="text-xs text-muted-foreground">{t.strongest}</p>
           <div className="flex flex-wrap gap-1.5">
             {suggested.map((m) => (
               <button
                 key={m.hero}
                 type="button"
-                aria-label={`Ban ${m.hero}`}
+                aria-label={t.ban(m.hero)}
                 onClick={() => onChange([...bans, m.hero])}
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-dashed border-border py-0.5 ps-0.5 pe-3 text-sm hover:border-destructive hover:bg-secondary"
               >
@@ -77,7 +85,9 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
                   <span className="ps-2" />
                 )}
                 <span>{m.hero}</span>
-                <span className="text-xs text-muted-foreground">{banReason(m)}</span>
+                {/* On a phone the win rate alone, so two or three fit a line. */}
+                <span className="text-xs text-muted-foreground sm:hidden">{t.banShort(Math.round(m.win * 100))}</span>
+                <span className="hidden text-xs text-muted-foreground sm:inline">{banReason(m, t.banReason)}</span>
               </button>
             ))}
           </div>

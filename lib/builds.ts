@@ -27,6 +27,10 @@ export type BuildPage = { data?: { records?: { data: { build?: Raw[] } }[] } };
 const named = (ids: number[] | undefined, names: Map<number, string>) =>
   (ids ?? []).flatMap((id) => (names.has(id) ? [names.get(id)!] : []));
 
+// The Academy files the Common emblem, the one every role can use, under
+// "All"; the game calls it Common.
+export const emblemName = (name: string) => (name.trim() === 'All' ? 'Common' : name);
+
 export function buildsFrom(
   page: BuildPage,
   items: Map<number, string>,
@@ -37,7 +41,7 @@ export function buildsFrom(
       winRate: b.build_win_rate,
       pickRate: b.build_pick_rate,
       spell: b.battleskill?.data?.__data?.skillname ?? '',
-      emblem: b.emblem?.data?.emblemname ?? '',
+      emblem: emblemName(b.emblem?.data?.emblemname ?? ''),
       talents: named(b.new_rune_skill, talents),
       items: named(b.equipid, items),
     }))

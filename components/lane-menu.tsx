@@ -1,7 +1,8 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import { LANES, laneLabel, type Lane } from '@/lib/draft';
+import { LANES, type Lane } from '@/lib/draft';
+import { useT } from '@/components/lang';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,10 +14,11 @@ import {
 // A pick's lane as one chip, with the others a tap away. The lane is filled
 // in for you and usually right, so the other four do not need to be on screen.
 export function LaneMenu({ value, onChange }: { value: Lane; onChange: (lane: Lane) => void }) {
+  const t = useT();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={`Lane: ${laneLabel(value)}. Change lane`}
+        aria-label={t.laneMenu(value.toUpperCase())}
         className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-primary ps-2.5 pe-1.5 font-display text-xs uppercase tracking-wide text-primary-foreground sm:h-7"
       >
         {value}

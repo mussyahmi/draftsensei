@@ -11,6 +11,7 @@ const draft: Draft = {
   myHero: '',
   bans: [],
   rank: 'all',
+  lang: 'en',
 };
 
 test('a new pool has an empty list for every lane', () => {

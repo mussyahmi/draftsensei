@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useT } from '@/components/lang';
 
 type Props = {
   open: boolean;
@@ -16,13 +17,14 @@ type Props = {
 };
 
 export function ChangelogDialog({ open, onOpenChange, releases }: Props) {
+  const t = useT();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>What&apos;s new</DialogTitle>
+          <DialogTitle>{t.whatsNew}</DialogTitle>
           <DialogDescription>
-            You&apos;re on v{process.env.NEXT_PUBLIC_APP_VERSION}.
+            {t.youreOn(process.env.NEXT_PUBLIC_APP_VERSION ?? '')} {t.changelogNote}
           </DialogDescription>
         </DialogHeader>
 

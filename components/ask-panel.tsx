@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Copy, Loader2, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy, Ellipsis, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { answerLines, type Line } from '@/lib/answer-text';
 import { buildBlocks, heroOf, itemOf, type Block } from '@/lib/icons';
 import { HEROES } from '@/lib/heroes';
 import { GameImage } from '@/components/game-image';
+import { useT } from '@/components/lang';
 
 export type Answer = {
   text: string;
@@ -57,6 +58,7 @@ type Props = {
 // One phase's ask button with its answer underneath. The page has two: hero
 // picks, then my build.
 export function AskPanel({ label, prompt, answer, loading, error, portraits, onAsk }: Props) {
+  const t = useT();
   const [showPrompt, setShowPrompt] = useState(false);
   const [copied, setCopied] = useState(false);
   // Folding the answer away frees the screen for editing picks. A fresh
@@ -129,7 +131,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
           ) : (
             <Sparkles className="size-4" />
           )}
-          {loading ? 'Asking…' : answer ? 'Ask again' : label}
+          {loading ? t.asking : answer ? t.askAgain : label}
         </Button>
         <Button
           variant="ghost"
@@ -138,9 +140,14 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
             setShowPrompt(!showPrompt || collapsed);
             setCollapsed(false);
           }}
-          className="shrink-0 text-xs text-muted-foreground"
+          // What Gemini is asked is for the curious, not part of a draft, so
+          // it sits behind a small button rather than a labelled one.
+          aria-label={showPrompt && !collapsed ? t.hidePrompt : t.showPrompt}
+          title={showPrompt && !collapsed ? t.hidePrompt : t.showPrompt}
+          aria-pressed={showPrompt && !collapsed}
+          className="size-11 shrink-0 text-muted-foreground"
         >
-          {showPrompt && !collapsed ? 'Hide prompt' : 'Show prompt'}
+          <Ellipsis className="size-4" />
         </Button>
       </div>
 
@@ -148,7 +155,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
             {!stale && answer.model}
-            {!stale && answer.searched && ' · searched Google'}
+            {!stale && answer.searched && ` · ${t.searched}`}
           </span>
           <Button
             variant="ghost"
@@ -157,7 +164,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
             className="h-6 shrink-0 px-2 text-xs text-muted-foreground"
           >
             {collapsed ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            {collapsed ? 'Show answer' : 'Minimize'}
+            {collapsed ? t.showAnswer : t.minimize}
           </Button>
         </div>
       )}
@@ -177,7 +184,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
         >
           {stale && (
             <p className="mb-1 font-display text-xs uppercase tracking-wider text-primary">
-              Picks changed, ask again
+              {t.stale}
             </p>
           )}
           <div className="space-y-0.5 text-base leading-snug">
@@ -221,7 +228,7 @@ export function AskPanel({ label, prompt, answer, loading, error, portraits, onA
           </pre>
           <Button variant="secondary" size="sm" onClick={copy}>
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            {copied ? 'Copied' : 'Copy prompt'}
+            {copied ? t.copied : t.copyPrompt}
           </Button>
         </div>
       )}

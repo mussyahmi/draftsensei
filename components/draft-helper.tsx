@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildPrompt,
-  laneLabel,
   newDraft,
   newPool,
   pickPrompt,
@@ -37,17 +36,21 @@ import { AccountButton } from '@/components/account-button';
 import { AskPanel, type Answer } from '@/components/ask-panel';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
-import { LanePicker } from '@/components/lane-picker';
+import { YouCard } from '@/components/you-card';
 import { PickList } from '@/components/pick-list';
 import { PoolDialog } from '@/components/pool-dialog';
 import { BanList } from '@/components/ban-list';
 import type { MetaHero } from '@/lib/bans';
 import { PickSuggestions } from '@/components/pick-suggestions';
+import { HowTo } from '@/components/how-to';
+import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import type { Ranked } from '@/lib/matchups';
 import { ChangelogDialog } from '@/components/changelog-dialog';
 import type { Release } from '@/lib/changelog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { LangProvider, LangToggle } from '@/components/lang';
+import { STRINGS, langFor, type Strings } from '@/lib/i18n';
 
 // The page asks twice: which hero to pick, then how to build them.
 type Phase = 'pick' | 'build';
@@ -67,18 +70,20 @@ const forPhase =
   <T,>(phase: Phase, value: T) =>
   (r: Record<Phase, T>) => ({ ...r, [phase]: value });
 
-function PhaseTitle({ n, children }: { n: number; children: React.ReactNode }) {
+function PhaseTitle({ n, children, aside }: { n: number; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <h2 className="font-display text-lg uppercase tracking-wide">
       <span className="text-primary">{n}</span> {children}
+      {aside && <span className="ms-2 font-sans text-sm normal-case tracking-normal text-muted-foreground">{aside}</span>}
     </h2>
   );
 }
 
-const SIDES: { key: Side; label: string }[] = [
-  { key: 'team', label: 'My team' },
-  { key: 'enemy', label: 'Enemy' },
-];
+const SIDES: Side[] = ['team', 'enemy'];
+
+// A message to show in whichever language is on when it is shown, so a
+// switch of language mid-error does not leave the old one on screen.
+type Say = (t: Strings) => string;
 
 export function DraftHelper({ releases }: { releases: Release[] }) {
   const [draft, setDraft] = useState<Draft>(newDraft);
@@ -86,10 +91,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   const [poolOpen, setPoolOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
 
-
   const [answers, setAnswers] = useState<Record<Phase, Answer | null>>({ pick: null, build: null });
   const [loading, setLoading] = useState<Record<Phase, boolean>>({ pick: false, build: false });
-  const [errors, setErrors] = useState<Record<Phase, string | null>>({ pick: null, build: null });
+  const [errors, setErrors] = useState<Record<Phase, Say | null>>({ pick: null, build: null });
   // Today's asks across everyone, out of the one shared free allowance.
   // Null until the server says, or if it cannot count.
   const [used, setUsed] = useState<number | null>(null);
@@ -101,13 +105,16 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   const [meta, setMeta] = useState<MetaHero[]>([]);
   // The best heroes for my lane as the board stands, from match data alone.
   const [instant, setInstant] = useState<Ranked[]>([]);
+  // The Academy's winning build for my hero, shown before any ask. Kept
+  // with the hero it is for, so a changed hero never shows the old build.
+  const [topBuild, setTopBuild] = useState<(TopBuild & { for: string }) | null>(null);
 
   const [account, setAccount] = useState<Account | null>(null);
   // Until the cloud copy has been compared with this device's, saving back
   // up would overwrite it with whatever happens to be here.
   const [reconciled, setReconciled] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncProblem, setSyncProblem] = useState<string | null>(null);
+  const [syncProblem, setSyncProblem] = useState<Say | null>(null);
 
   // Nothing in localStorage exists during the server render, so load after mount
   // and hold off saving until it is in.
@@ -119,7 +126,8 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   useEffect(() => {
     const saved = loadDraft();
     /* eslint-disable react-hooks/set-state-in-effect */
-    setDraft(saved.draft);
+    // Nothing saved yet means a first visit: start in the phone's language.
+    setDraft(saved.updatedAt ? saved.draft : { ...saved.draft, lang: langFor(navigator.language) });
     setPool(loadPool());
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -235,12 +243,30 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     };
   }, [hydrated, picks]);
 
+  useEffect(() => {
+    if (!draft.myHero) return;
+    const key = `${draft.myHero}|${draft.myLane}|${draft.rank}`;
+    const params = new URLSearchParams({ hero: draft.myHero, lane: draft.myLane, rank: draft.rank });
+    let current = true;
+    fetch(`/api/builds?${params}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((top: TopBuild | null) => {
+        if (current) setTopBuild(top ? { ...top, for: key } : null);
+      })
+      .catch(() => {
+        /* no instant build; Suggest build still works */
+      });
+    return () => {
+      current = false;
+    };
+  }, [draft.myHero, draft.myLane, draft.rank]);
+
   // What goes along with the prompt: the board as names for hero picks, my
   // hero and lane for a build, so the server can look up real stats.
   const ask = useCallback(async (phase: Phase, asking: string, extra: object) => {
-    const fail = (message: string) => setErrors(forPhase<string | null>(phase, message));
+    const fail = (message: Say) => setErrors(forPhase<Say | null>(phase, message));
     setLoading(forPhase(phase, true));
-    setErrors(forPhase<string | null>(phase, null));
+    setErrors(forPhase<Say | null>(phase, null));
     try {
       const response = await fetch('/api/ask', {
         method: 'POST',
@@ -260,11 +286,14 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       try {
         data = JSON.parse(body);
       } catch {
-        fail(`Server error (${response.status}). Check the dev server log.`);
+        fail((t) => t.serverError(response.status));
         return;
       }
       if (!response.ok) {
-        fail(data.error ?? 'Gemini did not answer.');
+        // A stall is the one failure worth saying in the player's language;
+        // the rest are Google's own words, which say exactly what went wrong.
+        const error = data.error;
+        fail(response.status === 504 ? (t) => t.tooSlow : (t) => error ?? t.noAnswer);
       } else {
         setAnswers(
           forPhase<Answer | null>(phase, {
@@ -278,7 +307,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         if (typeof data.used === 'number') setUsed(data.used);
       }
     } catch {
-      fail('No connection. Use Show prompt and paste it into Gemini.');
+      fail((t) => t.noConnection);
     } finally {
       setLoading(forPhase(phase, false));
     }
@@ -323,7 +352,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       })
       .catch((e: unknown) => {
         if (dropped) return;
-        setSyncProblem(`Could not read your saved data: ${reason(e)}`);
+        setSyncProblem(() => (t: Strings) => t.readFailed(reason(e)));
         setReconciled(true);
       });
 
@@ -347,19 +376,19 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         updatedAt: localMark.current?.at ?? Date.now(),
       })
         .then(() => setSyncProblem(null))
-        .catch((e: unknown) => setSyncProblem(`Could not save: ${reason(e)}`))
+        .catch((e: unknown) => setSyncProblem(() => (t: Strings) => t.saveFailed(reason(e))))
         .finally(() => setSyncing(false));
     }, 1200);
     return () => clearTimeout(id);
   }, [hydrated, uid, reconciled, draft, pool]);
 
   const signIn = () => {
-    signInWithGoogle().catch(() => setSyncProblem('Sign-in did not complete.'));
+    signInWithGoogle().catch(() => setSyncProblem(() => (t: Strings) => t.signInFailed));
   };
 
   const signOutNow = () => {
     setReconciled(false);
-    signOutOfGoogle().catch(() => setSyncProblem('Sign-out did not complete.'));
+    signOutOfGoogle().catch(() => setSyncProblem(() => (t: Strings) => t.signOutFailed));
   };
 
   const addPick = (side: Side, hero: string) => {
@@ -390,8 +419,8 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   };
 
   const resetDraft = () => {
-    // Lane and rank are about the player, not the draft, so they stay.
-    setDraft((d) => ({ ...newDraft(), myLane: d.myLane, rank: d.rank }));
+    // Lane, rank and language are about the player, not the draft, so they stay.
+    setDraft((d) => ({ ...newDraft(), myLane: d.myLane, rank: d.rank, lang: d.lang }));
     setAnswers({ pick: null, build: null });
     setErrors({ pick: null, build: null });
   };
@@ -403,51 +432,47 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     enemy: draft.picks.enemy.length,
   };
 
+  const t = STRINGS[draft.lang];
+
   return (
-    <>
+    <LangProvider lang={draft.lang}>
       <header className="border-b border-border bg-card/60">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex items-baseline gap-1.5">
-            <h1 className="font-display text-xl uppercase tracking-wider">DraftSensei</h1>
-            <button
-              type="button"
-              onClick={() => setChangelogOpen(true)}
-              title="What's new"
-              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-            >
-              v{process.env.NEXT_PUBLIC_APP_VERSION}
-            </button>
-          </div>
-          {/* On a phone the lane is the control touched most, so it spans the
-              width with thumb-sized chips. */}
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <span className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
-              I&apos;m playing
-            </span>
-            <LanePicker
-              value={draft.myLane}
-              onChange={(lane) => setDraft((d) => ({ ...d, myLane: lane }))}
-              className="flex-1 sm:flex-none"
-            />
+          <div className="flex w-full items-center gap-3 sm:w-auto">
+            <div className="flex items-baseline gap-1.5">
+              <h1 className="font-display text-xl uppercase tracking-wider">DraftSensei</h1>
+              <button
+                type="button"
+                onClick={() => setChangelogOpen(true)}
+                title={t.whatsNew}
+                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                v{process.env.NEXT_PUBLIC_APP_VERSION}
+              </button>
+            </div>
+            <div className="ms-auto sm:ms-0">
+              <LangToggle value={draft.lang} onChange={(lang) => setDraft((d) => ({ ...d, lang }))} />
+            </div>
           </div>
           <span className="text-xs text-muted-foreground">
-            {used !== null && `${used} / ${DAILY_LIMIT} asks today`}
+            {/* Only worth a glance once the shared allowance runs low. */}
+            {used !== null && used >= DAILY_LIMIT * 0.8 && t.asksToday(used, DAILY_LIMIT)}
           </span>
           <div className="ms-auto flex items-center gap-1">
             {firebaseReady && (
               <AccountButton
                 account={account}
                 busy={syncing}
-                problem={syncProblem}
+                problem={syncProblem?.(t) ?? null}
                 onSignIn={signIn}
                 onSignOut={signOutNow}
               />
             )}
             <Button variant="ghost" size="sm" onClick={() => setPoolOpen(true)}>
-              My heroes
+              {t.myHeroes}
             </Button>
             <Button variant="ghost" size="sm" onClick={resetDraft}>
-              New draft
+              {t.newDraft}
             </Button>
           </div>
         </div>
@@ -456,8 +481,30 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-4">
         {/* Groups sit further apart than the parts inside them, so it reads
             which heading and box belong together. */}
+        {/* Who is playing: set once, so it sits above the numbered steps of
+            the draft rather than being one of them. */}
         <section className="space-y-6">
-          <PhaseTitle n={1}>Picks</PhaseTitle>
+          {hydrated &&
+            !draft.myHero &&
+            !draft.bans.length &&
+            !draft.picks.team.length &&
+            !draft.picks.enemy.length && <HowTo />}
+          {/* On a phone the lane is the control touched most, so it spans the
+              width with thumb-sized chips. */}
+          <YouCard
+            lane={draft.myLane}
+            rank={draft.rank}
+            onLane={(lane) => setDraft((d) => ({ ...d, myLane: lane }))}
+            onRank={(rank) => setDraft((d) => ({ ...d, rank }))}
+          />
+        </section>
+
+        {/* The steps follow the game's own draft: bans, then picks, then the
+            build once the hero is locked in. */}
+        <section className="space-y-4 border-t border-border pt-8">
+          <PhaseTitle n={1} aside={`${draft.bans.length} / 10 · ${t.optional}`}>
+            {t.bans}
+          </PhaseTitle>
           <BanList
             bans={draft.bans}
             unavailable={taken}
@@ -465,48 +512,11 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             meta={meta}
             onChange={(bans) => setDraft((d) => ({ ...d, bans }))}
           />
-          <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2">
-            {SIDES.map((side) => (
-              <div key={side.key} className="space-y-2">
-                <h3
-                  className={cn(
-                    'font-display text-sm uppercase tracking-widest',
-                    side.key === 'team' ? 'text-ally' : 'text-enemy',
-                  )}
-                >
-                  {side.label} picks{' '}
-                  <span className="text-muted-foreground">{counts[side.key]} / 5</span>
-                </h3>
-                {/* A full side needs no more typing, so the box goes. */}
-                {counts[side.key] < 5 && (
-                  <HeroEntry
-                    onChoose={(hero) => addPick(side.key, hero)}
-                    unavailable={taken}
-                    autoFocus={side.key === 'enemy'}
-                    portraits={portraits}
-                  />
-                )}
-                <PickList
-                  picks={draft.picks[side.key]}
-                  side={side.key}
-                  onLane={(i, lane) => setLane(side.key, i, lane)}
-                  onRemove={(i) => removePick(side.key, i)}
-                  portraits={portraits}
-                  me={
-                    side.key === 'team' && draft.myHero
-                      ? { hero: draft.myHero, lane: draft.myLane }
-                      : undefined
-                  }
-                />
-              </div>
-            ))}
-          </div>
+        </section>
 
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Type a few letters, Enter to add. The lane is filled in for you. Tap
-            another lane to change it.
-          </p>
-
+        <section className="space-y-6 border-t border-border pt-8">
+          <PhaseTitle n={2}>{t.picks}</PhaseTitle>
+          {/* Above the lists, so a new pick never pushes them out of sight. */}
           {!draft.myHero && (
             <PickSuggestions
               // An emptied board keeps no stale picks from before.
@@ -516,22 +526,61 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             />
           )}
 
+          <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2">
+            {SIDES.map((side) => (
+              <div key={side} className="space-y-2">
+                <h3
+                  className={cn(
+                    'font-display text-sm uppercase tracking-widest',
+                    side === 'team' ? 'text-ally' : 'text-enemy',
+                  )}
+                >
+                  {side === 'team' ? t.teamPicks : t.enemyPicks}{' '}
+                  <span className="text-muted-foreground">{counts[side]} / 5</span>
+                </h3>
+                {/* A full side needs no more typing, so the box goes. */}
+                {counts[side] < 5 && (
+                  <HeroEntry
+                    onChoose={(hero) => addPick(side, hero)}
+                    unavailable={taken}
+                    autoFocus={side === 'enemy'}
+                    portraits={portraits}
+                  />
+                )}
+                <PickList
+                  picks={draft.picks[side]}
+                  side={side}
+                  onLane={(i, lane) => setLane(side, i, lane)}
+                  onRemove={(i) => removePick(side, i)}
+                  portraits={portraits}
+                  me={
+                    side === 'team' && draft.myHero
+                      ? { hero: draft.myHero, lane: draft.myLane }
+                      : undefined
+                  }
+                  onClearMe={() => setDraft((d) => ({ ...d, myHero: newDraft().myHero }))}
+                />
+              </div>
+            ))}
+          </div>
+
+
           <AskPanel
-            label="Suggest heroes"
+            label={t.suggestHeroes}
             prompt={prompts.pick}
             answer={answers.pick}
             loading={loading.pick}
-            error={errors.pick}
+            error={errors.pick?.(t) ?? null}
             portraits={portraits}
             onAsk={askPicks}
           />
         </section>
 
         <section className="space-y-6 border-t border-border pt-8">
-          <PhaseTitle n={2}>My build</PhaseTitle>
+          <PhaseTitle n={3}>{t.myBuild}</PhaseTitle>
           <div className="max-w-sm space-y-2">
             <h3 className="font-display text-sm uppercase tracking-widest text-primary">
-              The hero I picked
+              {t.heroIPicked}
             </h3>
             <HeroEntry
               onChoose={(hero) => setDraft((d) => ({ ...d, myHero: hero }))}
@@ -546,18 +595,22 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
                 )}
                 <span>
                   {draft.myHero}{' '}
-                  <span className="text-muted-foreground">({laneLabel(draft.myLane)})</span>
+                  <span className="text-muted-foreground">({draft.myLane.toUpperCase()})</span>
                 </span>
               </p>
             )}
           </div>
 
+          {topBuild && topBuild.for === `${draft.myHero}|${draft.myLane}|${draft.rank}` && (
+            <InstantBuild top={topBuild} />
+          )}
+
           <AskPanel
-            label="Suggest build"
+            label={t.suggestBuild}
             prompt={prompts.build}
             answer={answers.build}
             loading={loading.build}
-            error={errors.build}
+            error={errors.build?.(t) ?? null}
             portraits={portraits}
             onAsk={askBuild}
           />
@@ -576,9 +629,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         pool={pool}
         onChange={setPool}
         portraits={portraits}
-        rank={draft.rank}
-        onRank={(rank) => setDraft((d) => ({ ...d, rank }))}
       />
-    </>
+    </LangProvider>
   );
 }

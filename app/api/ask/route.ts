@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         '',
         'match data from ranked games, win rate change for heroes who play my lane:',
         ...lines,
-        'choose the best 3 from this match data; in each reason name the enemy hero it counters best, in your own words',
+        'choose the best 3 from this match data; in each reason name the enemy hero it counters best, or the teammate it combos with if that gain is bigger, in your own words',
       ].join('\n');
     }
   }

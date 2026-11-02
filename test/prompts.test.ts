@@ -11,6 +11,7 @@ const draft: Draft = {
   myHero: 'Rafaela',
   bans: [],
   rank: 'all',
+  lang: 'en',
 };
 
 test('pick prompt asks for my lane and lists picks with their lanes', () => {
