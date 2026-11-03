@@ -85,3 +85,77 @@ test('the data source being down still answers, with what needs no data', async 
   expect(body.counters).toBeNull();
   expect(body.damage.team.physical + body.damage.team.magic + body.damage.team.mixed).toBe(5);
 });
+
+test('my best partner is named when the best pair is someone else', () => {
+  const alongside = new Map([
+    ['Chou', new Map([['Kagura', 0.02]])],
+    ['Khufra', new Map([['Moskov', 0.01], ['Chou', -0.01]])],
+  ]);
+  const check = draftCheck({ ...base, alongside });
+  expect(check.combo).toEqual({ a: 'Chou', b: 'Kagura', gain: 0.02 });
+  expect(check.partner).toEqual({ me: 'Khufra', ally: 'Moskov', gain: 0.01 });
+});
+
+test('my partner reads the same whichever side of the table I am on', () => {
+  const alongside = new Map([
+    ['Chou', new Map([['Kagura', 0.02]])],
+    ['Moskov', new Map([['Khufra', 0.01]])],
+  ]);
+  expect(draftCheck({ ...base, alongside }).partner).toEqual({ me: 'Khufra', ally: 'Moskov', gain: 0.01 });
+});
+
+test('in the best pair myself, or with no gain beside anyone, there is no second line', () => {
+  const mineIsBest = new Map([['Khufra', new Map([['Chou', 0.03]])], ['Kagura', new Map([['Moskov', 0.01]])]]);
+  expect(draftCheck({ ...base, alongside: mineIsBest }).partner).toBeNull();
+  const noGain = new Map([['Chou', new Map([['Kagura', 0.02]])], ['Khufra', new Map([['Moskov', -0.01]])]]);
+  expect(draftCheck({ ...base, alongside: noGain }).partner).toBeNull();
+  expect(draftCheck({ ...base, me: null }).partner).toBeNull();
+});
+
+test('my matchups name who I do best and worst against', () => {
+  const against = new Map([
+    ['Rafaela', new Map([['Khufra', 0.02], ['Moskov', 0.05]])],
+    ['Selena', new Map([['Khufra', -0.01], ['Moskov', -0.09]])],
+    ['Bruno', new Map([['Khufra', 0.005]])],
+  ]);
+  expect(draftCheck({ ...base, opponent: null, against }).matchups).toEqual({
+    best: { enemy: 'Rafaela', gain: 0.02 },
+    worst: { enemy: 'Selena', gain: -0.01 },
+  });
+});
+
+test('all winning or all losing, my matchups show only that side', () => {
+  const winning = new Map([['Rafaela', new Map([['Khufra', 0.02]])], ['Selena', new Map([['Khufra', 0.01]])]]);
+  expect(draftCheck({ ...base, opponent: null, against: winning }).matchups).toEqual({
+    best: { enemy: 'Rafaela', gain: 0.02 },
+    worst: null,
+  });
+  const losing = new Map([['Rafaela', new Map([['Khufra', -0.02]])], ['Selena', new Map([['Khufra', -0.01]])]]);
+  expect(draftCheck({ ...base, opponent: null, against: losing }).matchups).toEqual({
+    best: null,
+    worst: { enemy: 'Rafaela', gain: -0.02 },
+  });
+});
+
+test('with no hero of mine, or no numbers for it, there are no matchups', () => {
+  expect(draftCheck({ ...base, me: null }).matchups).toBeNull();
+  expect(draftCheck({ ...base, against: new Map() }).matchups).toBeNull();
+  const flat = new Map([['Rafaela', new Map([['Khufra', 0]])]]);
+  expect(draftCheck({ ...base, opponent: null, against: flat }).matchups).toBeNull();
+});
+
+test('the enemy in my lane has its own line, so my matchups leave it out', () => {
+  const against = new Map([
+    ['Rafaela', new Map([['Khufra', -0.02]])],
+    ['Selena', new Map([['Khufra', 0.01]])],
+    ['Bruno', new Map([['Khufra', -0.005]])],
+  ]);
+  const check = draftCheck({ ...base, against });
+  expect(check.lane).toEqual({ me: 'Khufra', enemy: 'Rafaela', gain: -0.02 });
+  expect(check.matchups).toEqual({
+    best: { enemy: 'Selena', gain: 0.01 },
+    worst: { enemy: 'Bruno', gain: -0.005 },
+  });
+  const onlyLane = new Map([['Rafaela', new Map([['Khufra', -0.02]])]]);
+  expect(draftCheck({ ...base, against: onlyLane }).matchups).toBeNull();
+});

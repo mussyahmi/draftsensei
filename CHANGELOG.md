@@ -6,6 +6,15 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.8.0] - 2026-11-03
+
+### Added
+- Draft check shows who your hero does best and worst against.
+- Draft check names your best partner when the best pair on your team is someone else.
+
+### Changed
+- Draft check says Best pair instead of Best combo: the number shows who wins more together, not whose skills combine.
+
 ## [0.7.0] - 2026-11-03
 
 ### Fixed

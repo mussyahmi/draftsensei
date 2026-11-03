@@ -14,7 +14,14 @@ export type DraftCheck = {
     best: { hero: string; enemy: string; gain: number } | null;
     worst: { hero: string; enemy: string; gain: number } | null;
   } | null;
+  // Who I do best and worst against, so I know who to chase and who to avoid.
+  matchups: {
+    best: { enemy: string; gain: number } | null;
+    worst: { enemy: string; gain: number } | null;
+  } | null;
   combo: { a: string; b: string; gain: number } | null;
+  // My own best teammate, when the best pair is not already mine.
+  partner: { me: string; ally: string; gain: number } | null;
   damage: { team: DamageSplit; enemy: DamageSplit };
 };
 
@@ -48,13 +55,20 @@ export function draftCheck(input: {
   );
   const ranked = [...pairs].sort((a, b) => b.gain - a.gain);
 
+  // The enemy in my lane already has its own line.
+  const mine = ranked.filter((p) => p.hero === me && p.enemy !== opponent);
+  const myBest = mine[0];
+  const myWorst = mine.at(-1);
+
   const combos = team.flatMap((a) =>
     team.flatMap((b) => {
       const gain = a === b ? undefined : alongside.get(a)?.get(b);
       return gain === undefined ? [] : [{ a, b, gain }];
     }),
   );
-  const combo = combos.sort((x, y) => y.gain - x.gain)[0];
+  const sorted = combos.sort((x, y) => y.gain - x.gain).filter((c) => c.gain > 0);
+  const combo = sorted[0];
+  const myPair = me ? sorted.find((c) => c.a === me || c.b === me) : undefined;
 
   return {
     lane: me && opponent && laneGain !== undefined ? { me, enemy: opponent, gain: laneGain } : null,
@@ -66,7 +80,17 @@ export function draftCheck(input: {
           worst: ranked.at(-1)!.gain < 0 ? ranked.at(-1)! : null,
         }
       : null,
-    combo: combo && combo.gain > 0 ? combo : null,
+    matchups:
+      myBest && (myBest.gain > 0 || myWorst!.gain < 0)
+        ? {
+            best: myBest.gain > 0 ? { enemy: myBest.enemy, gain: myBest.gain } : null,
+            worst: myWorst!.gain < 0 ? { enemy: myWorst!.enemy, gain: myWorst!.gain } : null,
+          }
+        : null,
+    combo: combo ?? null,
+    partner: me && myPair && myPair !== combo && combo.a !== me && combo.b !== me
+      ? { me, ally: myPair.a === me ? myPair.b : myPair.a, gain: myPair.gain }
+      : null,
     damage: { team: damageSplit(team), enemy: damageSplit(enemy) },
   };
 }

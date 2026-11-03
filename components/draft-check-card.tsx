@@ -61,7 +61,7 @@ export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
 
   const check = answer?.asked === asked ? answer.check : null;
   if (!check) return null;
-  const { lane, strength, counters, combo, damage } = check;
+  const { lane, strength, counters, matchups, combo, partner, damage } = check;
   const split = (s: DraftCheck['damage']['team']) => t.damageSplit(s.physical, s.magic, s.mixed);
 
   return (
@@ -98,9 +98,28 @@ export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
             )}
           </Row>
         )}
+        {matchups && (
+          <Row label={t.checkMatchups}>
+            {matchups.best && (
+              <span className="block">
+                {t.checkBest(matchups.best.enemy)} <Gain value={matchups.best.gain} />
+              </span>
+            )}
+            {matchups.worst && (
+              <span className="block">
+                {t.checkWorst(matchups.worst.enemy)} <Gain value={matchups.worst.gain} />
+              </span>
+            )}
+          </Row>
+        )}
         {combo && (
-          <Row label={t.checkCombo}>
+          <Row label={t.checkPair}>
             {combo.a} + {combo.b} <Gain value={combo.gain} />
+          </Row>
+        )}
+        {partner && (
+          <Row label={t.checkPartner}>
+            {partner.me} + {partner.ally} <Gain value={partner.gain} />
           </Row>
         )}
         <Row label={t.checkDamage}>
