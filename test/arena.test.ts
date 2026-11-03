@@ -103,3 +103,20 @@ test('a rate limit reported in the body is not kept as an empty catalog', async 
   await expect(loadCatalog(1)).rejects.toThrow();
   expect(calls).toBeGreaterThan(3);
 });
+
+test('a counters table is flipped into the listed hero\'s gain; a teammates table is not', async () => {
+  vi.stubGlobal('fetch', async (url: string) => {
+    if (url.includes('/heroes?size')) {
+      const hero = (hero_id: number, name: string) => ({ data: { hero_id, hero: { data: { name } } } });
+      return new Response(JSON.stringify({ data: { records: [hero(88, 'Masha'), hero(7, 'Estes'), hero(9, 'Gloo'), hero(5, 'Nana')] } }));
+    }
+    const rows = [{ heroid: 7, increase_win_rate: -0.032 }, { heroid: 9, increase_win_rate: 0.038 }, { heroid: 5, increase_win_rate: 0 }];
+    return new Response(JSON.stringify({ data: { records: [{ data: { sub_hero: rows } }] } }));
+  });
+  const against = await loadGains('Masha', 'counters', 'all', 0);
+  expect(against.get('Estes')).toBeCloseTo(0.032);
+  expect(against.get('Gloo')).toBeCloseTo(-0.038);
+  expect(Object.is(against.get('Nana'), 0)).toBe(true);
+  const beside = await loadGains('Masha', 'teammates', 'all', 0);
+  expect(beside.get('Estes')).toBeCloseTo(-0.032);
+});

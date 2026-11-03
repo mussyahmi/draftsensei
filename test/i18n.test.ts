@@ -23,7 +23,12 @@ test('no long dashes in either language', () => {
 });
 
 test('with Malay on, Gemini is asked to answer in Malay and keep game names in English', () => {
-  const draft = { ...newDraft(), lang: 'ms' as const, myHero: 'Nana' };
+  const draft = {
+    ...newDraft(),
+    lang: 'ms' as const,
+    myHero: 'Nana',
+    picks: { enemy: [], team: [{ hero: 'Tigreal', lane: 'roam' as const }] },
+  };
   expect(pickPrompt(draft)).toContain('formal Malay');
   const build = buildPrompt(draft);
   expect(build).toContain('Bantu dahulu:, Ult pada:, Syarat menang:');

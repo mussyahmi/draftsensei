@@ -66,3 +66,37 @@ test('a pick answer becomes chips: each hero line with its reason', () => {
     { hero: 'Vexana', reason: 'Outmatches Xavier directly.' },
   ]);
 });
+
+test('a reason on the line under the name still belongs to that hero', () => {
+  const heroes = ['Khufra', 'Chip', 'Nolan', 'Minotaur'];
+  expect(picksOf('Khufra\nStops dashes.\n\nChip\nFast help.\n\nMinotaur\nHeals the team.', heroes)).toEqual([
+    { hero: 'Khufra', reason: 'Stops dashes.' },
+    { hero: 'Chip', reason: 'Fast help.' },
+    { hero: 'Minotaur', reason: 'Heals the team.' },
+  ]);
+});
+
+test('a reason under the name may open with an enemy, and is not taken for a pick', () => {
+  const heroes = ['Khufra', 'Nolan'];
+  expect(picksOf('Khufra\nNolan cannot dash past him.', heroes)).toEqual([
+    { hero: 'Khufra', reason: 'Nolan cannot dash past him.' },
+  ]);
+});
+
+test('a bare list of names stays a list, and a same line reason stays put', () => {
+  const heroes = ['Khufra', 'Chip'];
+  expect(picksOf('Khufra\nChip', heroes)).toEqual([{ hero: 'Khufra', reason: '' }, { hero: 'Chip', reason: '' }]);
+  expect(picksOf('Khufra: stops dashes\nChip: fast help', heroes)).toEqual([
+    { hero: 'Khufra', reason: 'stops dashes' },
+    { hero: 'Chip', reason: 'fast help' },
+  ]);
+});
+
+test('a heading before the first hero is ignored', () => {
+  expect(picksOf('Here are my picks:\nKhufra: stops dashes', ['Khufra'])).toEqual([{ hero: 'Khufra', reason: 'stops dashes' }]);
+});
+
+test('an emblem written with the word emblem still gives its name', () => {
+  expect(itemOf('Emblem: Tank Emblem (Agility, Wilderness Blessing, Concussive Blast)')).toBe('Tank');
+  expect(itemOf('- **Emblem:** Support Emblem')).toBe('Support');
+});

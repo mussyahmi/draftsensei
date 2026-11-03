@@ -22,7 +22,7 @@ test('pick prompt asks for my lane and lists picks with their lanes', () => {
     '',
     'my team pick: lukas (jungling) marcel (roaming)',
     '',
-    'answer with hero names, each with a reason of 6 words max',
+    'answer with hero names, one line each as hero: reason, the reason 10 words max',
     'do not suggest a hero already picked by either team',
   ].join('\n'));
 });
@@ -97,4 +97,24 @@ test('every lane key renders its in-game wording', () => {
   expect(pickPrompt(d)).toMatch(
     /enemy pick: lukas \(exp lane\) eudora \(mid lane\) masha \(jungling\) layla \(gold lane\) rafaela \(roaming\)/,
   );
+});
+
+test('build prompt tells Gemini what the enemy damage calls for, only when it leans', () => {
+  const lean: Draft = {
+    ...draft,
+    picks: { ...draft.picks, enemy: ['Layla', 'Hayabusa', 'Saber', 'Nana'].map((hero) => ({ hero, lane: 'mid' as const })) },
+  };
+  expect(buildPrompt(lean)).toContain('enemy damage: 3 physical, 1 magic, so favour physical defense items');
+  expect(buildPrompt(draft)).not.toContain('enemy damage');
+});
+
+test('build prompt asks who to help first only when there is a teammate to name', () => {
+  const alone: Draft = { ...draft, myHero: 'Marcel', picks: { ...draft.picks, team: [{ hero: 'Marcel', lane: 'roam' }] } };
+  expect(buildPrompt(alone)).toContain('then 2 short lines, each starting with its label: Ult on:, Win condition:');
+  expect(buildPrompt(alone)).toContain('the first label names an enemy hero to use my ultimate on');
+  expect(buildPrompt(alone)).not.toContain('Help first');
+  expect(buildPrompt({ ...alone, lang: 'ms' })).toContain('Ult pada:, Syarat menang:');
+  expect(buildPrompt({ ...alone, lang: 'ms' })).not.toContain('Bantu dahulu');
+  const friend: Draft = { ...alone, picks: { ...alone.picks, team: [{ hero: 'Tigreal', lane: 'roam' }] } };
+  expect(buildPrompt(friend)).toContain('Help first:, Ult on:, Win condition:');
 });

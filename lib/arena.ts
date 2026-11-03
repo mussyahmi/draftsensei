@@ -151,7 +151,12 @@ export async function loadGains(
           new Map(
             (page.data?.records?.[0]?.data.sub_hero ?? []).flatMap((s) => {
               const name = names.get(s.heroid);
-              return name ? [[name, s.increase_win_rate] as const] : [];
+              if (!name) return [];
+              // A counters table says how the main hero does against each
+              // listed hero, whatever the API's docs say: the game's own
+              // strong and weak lists and well known matchups all read that
+              // way. Everywhere else a gain is the listed hero's, so flip it.
+              return [[name, kind === 'counters' ? 0 - s.increase_win_rate : s.increase_win_rate] as const];
             }),
           ),
       ),

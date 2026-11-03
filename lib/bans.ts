@@ -3,7 +3,13 @@
 // banned in most games barely shows a win rate, since it is rarely played,
 // so its ban rate says the threat for it.
 
-export type MetaHero = { hero: string; win: number; ban: number };
+export type MetaHero = {
+  hero: string;
+  win: number;
+  ban: number;
+  // The hero of mine it beats the hardest, when it beats one.
+  threat?: { hero: string; gain: number };
+};
 
 type RankRecord = {
   data: {
@@ -30,6 +36,36 @@ export function metaFrom(page: RankPage): MetaHero[] {
     }))
     .filter((m) => m.hero && Number.isFinite(m.win) && Number.isFinite(m.ban))
     .sort((a, b) => score(b) - score(a));
+}
+
+// Below this a hero barely beats mine: about a quarter of all heroes clear
+// one point against any given hero, so that would name nearly everyone.
+export const MIN_THREAT = 0.02;
+
+/** "+3.0%": one decimal, as on the pick suggestions. */
+export const threatGain = (gain: number) => `+${(gain * 100).toFixed(1)}%`;
+
+const threatScore = (m: MetaHero) => score(m) + (m.threat?.gain ?? 0);
+
+/**
+ * Every hero again, with those beating my heroes moved up by how hard: each
+ * table holds how much better other heroes do against one of mine. The hardest
+ * single counter counts, so a long list of mine does not lift everyone more.
+ */
+export function withThreats(
+  meta: MetaHero[],
+  counters: (readonly [string, Map<string, number>])[],
+): MetaHero[] {
+  return meta
+    .map((m) => {
+      const threat = counters
+        .filter(([mine]) => mine !== m.hero)
+        .map(([hero, table]) => ({ hero, gain: table.get(m.hero) ?? 0 }))
+        .filter((t) => t.gain >= MIN_THREAT)
+        .sort((a, b) => b.gain - a.gain)[0];
+      return threat ? { ...m, threat } : m;
+    })
+    .sort((a, b) => threatScore(b) - threatScore(a));
 }
 
 export const BAN_SUGGESTIONS = 5;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
 import {
   buildPrompt,
   newDraft,
@@ -39,10 +40,13 @@ import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
 import { YouCard } from '@/components/you-card';
 import { PickList } from '@/components/pick-list';
+import { DraftCheckCard } from '@/components/draft-check-card';
 import { PoolDialog } from '@/components/pool-dialog';
+import { TeammatePicks } from '@/components/teammate-picks';
 import { WinRate } from '@/components/win-rate';
 import { BanList } from '@/components/ban-list';
 import { winsBy, type MetaHero } from '@/lib/bans';
+import { enemyDamage, teamGaps } from '@/lib/team-balance';
 import { PickSuggestions } from '@/components/pick-suggestions';
 import { HowTo } from '@/components/how-to';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
@@ -156,11 +160,15 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       });
   }, []);
 
-  // Strongest heroes at my rank; asked again only when the rank changes.
+  // Strongest heroes at my rank, and what beats the heroes I play in my lane;
+  // asked again only when one of those changes.
+  const mine = poolFor(pool, draft.myLane).join('|');
   useEffect(() => {
     if (!hydrated) return;
     let current = true;
-    fetch(`/api/bans?rank=${draft.rank}`)
+    const query = new URLSearchParams({ rank: draft.rank });
+    for (const hero of mine ? mine.split('|') : []) query.append('mine', hero);
+    fetch(`/api/bans?${query}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((m: MetaHero[]) => {
         if (current) setMeta(m);
@@ -171,7 +179,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     return () => {
       current = false;
     };
-  }, [hydrated, draft.rank]);
+  }, [hydrated, draft.rank, mine]);
 
   // What was last written, and when. Refs, because these are bookkeeping for
   // the save effects rather than anything the screen renders — and they are
@@ -473,6 +481,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     enemy: draft.picks.enemy.length,
   };
 
+  const gaps = teamGaps([...new Set([...draft.picks.team.map((p) => p.hero), ...(draft.myHero ? [draft.myHero] : [])])]);
+  const enemyHits = enemyDamage(draft.picks.enemy.map((p) => p.hero));
+
   const t = STRINGS[draft.lang];
 
   // The AI's picks for the board as it is now. Once the board changes they
@@ -568,7 +579,8 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
           <PhaseTitle n={2}>{t.picks}</PhaseTitle>
           {/* Above the lists, so a new pick never pushes them out of sight. */}
           <div ref={chipsRef} className="scroll-mt-4 empty:hidden">
-            {!draft.myHero && (
+            {/* A full team has no pick left to suggest. */}
+            {!draft.myHero && counts.team < 5 && (
               <PickSuggestions
                 // An emptied board keeps no stale picks from before.
                 ranked={picks.enemy.length || picks.team.length ? instant : []}
@@ -578,6 +590,25 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
               />
             )}
           </div>
+
+          {/* Open lanes keep going after my own pick: that is often when
+              teammates are still deciding. */}
+          {(picks.enemy.length > 0 || picks.team.length > 0) && counts.team < 5 && (
+            <TeammatePicks
+              board={{
+                ...picks,
+                team: [...new Set([...picks.team, ...(draft.myHero ? [draft.myHero] : [])])],
+              }}
+              closed={[draft.myLane, ...draft.picks.team.map((p) => p.lane)]}
+              portraits={portraits}
+              onAdd={(hero, lane) =>
+                setDraft((d) => ({
+                  ...d,
+                  picks: { ...d.picks, team: [...d.picks.team, { hero, lane }] },
+                }))
+              }
+            />
+          )}
 
           <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2">
             {SIDES.map((side) => (
@@ -613,24 +644,42 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
                   }
                   onClearMe={() => setDraft((d) => ({ ...d, myHero: newDraft().myHero }))}
                 />
+                {side === 'team' && gaps.length > 0 && (
+                  <p className="flex items-center gap-1.5 text-sm text-primary">
+                    <TriangleAlert className="size-4 shrink-0" />
+                    {gaps.map((gap) => t.gaps[gap]).join(' · ')}
+                  </p>
+                )}
               </div>
             ))}
           </div>
 
 
-          <AskPanel
-            label={instant.length && (picks.enemy.length || picks.team.length) ? t.askAiPick : t.suggestHeroes}
-            // The AI's picks show as the chips above, and once the board moves
-            // on the fresh chips take over; only an answer that names no hero
-            // is left to read as text.
-            showAnswer={!answeredPicks.length}
-            prompt={prompts.pick}
-            answer={answers.pick}
-            loading={loading.pick}
-            error={errors.pick?.(t) ?? null}
-            portraits={portraits}
-            onAsk={askPicks}
-          />
+          {counts.team < 5 && (
+            <AskPanel
+              label={instant.length && (picks.enemy.length || picks.team.length) ? t.askAiPick : t.suggestHeroes}
+              // The AI's picks show as the chips above, and once the board moves
+              // on the fresh chips take over; only an answer that names no hero
+              // is left to read as text.
+              showAnswer={!answeredPicks.length}
+              prompt={prompts.pick}
+              answer={answers.pick}
+              loading={loading.pick}
+              error={errors.pick?.(t) ?? null}
+              portraits={portraits}
+              onAsk={askPicks}
+            />
+          )}
+
+          {counts.team === 5 && counts.enemy === 5 && (
+            <DraftCheckCard
+              team={[...new Set([...draft.picks.team.map((p) => p.hero), ...(draft.myHero ? [draft.myHero] : [])])]}
+              enemy={draft.picks.enemy.map((p) => p.hero)}
+              me={draft.myHero || draft.picks.team.find((p) => p.lane === draft.myLane)?.hero || null}
+              opponent={draft.picks.enemy.find((p) => p.lane === draft.myLane)?.hero ?? null}
+              rank={draft.rank}
+            />
+          )}
         </section>
 
         <section ref={buildSectionRef} className="scroll-mt-4 space-y-6 border-t border-border pt-8">
@@ -661,6 +710,17 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
               </p>
             )}
           </div>
+
+          {/* The instant build is the same into any team, so this says what
+              this enemy team calls for without an ask. */}
+          {draft.myHero && enemyHits && (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {t.enemyDamage(enemyHits.physical, enemyHits.magic, enemyHits.mixed)}
+              </span>{' '}
+              {t.defenseTip[enemyHits.lean]}
+            </p>
+          )}
 
           {/* One build on screen: the ranked one until the AI has adjusted it
               for this enemy team, then the adjusted one in its place. */}

@@ -1,4 +1,5 @@
 import type { Lang } from './i18n';
+import { enemyDamage } from './team-balance';
 
 export type Lane = 'exp' | 'mid' | 'jungle' | 'gold' | 'roam';
 
@@ -35,19 +36,71 @@ export type Draft = {
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// Names players use that no rule below could work out.
+const NICKNAMES: Record<string, string> = {
+  pk: 'Popol and Kupa',
+  gwen: 'Guinevere',
+};
+
+const wordsOf = (hero: string) => hero.split(/[\s.-]+/).filter((w) => w && w.toLowerCase() !== 'and');
+
+// "yss" for Yi Sun-shin: first letters only for names of two words or more,
+// so a short query does not match half the roster.
+const initialsOf = (hero: string) => {
+  const words = wordsOf(hero);
+  return words.length > 1 ? normalize(words.map((w) => w[0]).join('')) : '';
+};
+
+// Letters changed, added, dropped or swapped to get from one to the other.
+function typos(a: string, b: string) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// Too short and a typo could be anything, so nothing under four letters.
+const MIN_FOR_TYPOS = 4;
+const typosAllowed = (q: string) => (q.length >= 6 ? 2 : 1);
+
+// How far a query is from a hero, as a whole name, the start of one still being
+// typed, or either of those for one of its words.
+function typoDistance(q: string, hero: string) {
+  const names = [hero, ...wordsOf(hero)].map(normalize).filter((n) => n.length >= 3);
+  return Math.min(...names.flatMap((n) => [typos(q, n), typos(q, n.slice(0, q.length))]));
+}
+
 export function searchHeroes(query: string, heroes: string[], taken: string[] = []) {
   const q = normalize(query);
   if (!q) return [];
   const takenSet = new Set(taken);
+  const open = heroes.filter((hero) => !takenSet.has(hero));
   const prefix: string[] = [];
+  const short: string[] = [];
   const inner: string[] = [];
-  for (const hero of heroes) {
-    if (takenSet.has(hero)) continue;
+  for (const hero of open) {
     const at = normalize(hero).indexOf(q);
     if (at === 0) prefix.push(hero);
+    else if (NICKNAMES[q] === hero || initialsOf(hero) === q) short.push(hero);
     else if (at > 0) inner.push(hero);
   }
-  return [...prefix, ...inner];
+  const found = [...prefix, ...short, ...inner];
+  // An exact match always wins: typos are only for when nothing else fits.
+  if (found.length || q.length < MIN_FOR_TYPOS) return found;
+  return open
+    .map((hero) => ({ hero, off: typoDistance(q, hero) }))
+    .filter((m) => m.off <= typosAllowed(q))
+    // On a tie, the name starting the same way: people rarely miss the first letter.
+    .sort((a, b) => a.off - b.off || Number(normalize(b.hero)[0] === q[0]) - Number(normalize(a.hero)[0] === q[0]))
+    .map((m) => m.hero);
 }
 
 export const LANES: { key: Lane; label: string }[] = [
@@ -84,7 +137,7 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
     `my team pick: ${withLanes(draft.picks.team)}`,
     '',
     ...(draft.bans.length ? [`banned: ${draft.bans.map((h) => h.toLowerCase()).join(', ')}`, ''] : []),
-    'answer with hero names, each with a reason of 6 words max',
+    'answer with hero names, one line each as hero: reason, the reason 10 words max',
     'do not suggest a hero already picked by either team',
     ...(draft.lang === 'ms' ? ['write the reasons in formal Malay (Bahasa Melayu), hero names in English'] : []),
     ...(mine.length
@@ -104,9 +157,19 @@ const BLESSINGS: Partial<Record<Lane, string>> = {
 // out who each line is about.
 const ADVICE_MEANING =
   'the first label names a teammate from my team to support first, the second an enemy hero to use my ultimate on';
+// With no teammate entered yet there is nobody to name, and Gemini fills the
+// label with an enemy, so it is not asked for.
+const ADVICE_NO_TEAM = 'the first label names an enemy hero to use my ultimate on';
 
 export function buildPrompt(draft: Draft) {
   const blessing = BLESSINGS[draft.myLane];
+  const damage = enemyDamage(draft.picks.enemy.map((p) => p.hero));
+  const teammates = draft.picks.team.some((p) => p.hero !== draft.myHero);
+  const meaning = teammates ? ADVICE_MEANING : ADVICE_NO_TEAM;
+  const labels = draft.lang === 'ms'
+    ? [...(teammates ? ['Bantu dahulu:'] : []), 'Ult pada:', 'Syarat menang:']
+    : [...(teammates ? ['Help first:'] : []), 'Ult on:', 'Win condition:'];
+  const asked = `then ${labels.length} short lines, each starting with its label: ${labels.join(', ')}`;
   return [
     `suggest mobile legends spell and item build for ${(draft.myHero || '...').toLowerCase()} (${laneLabel(draft.myLane)})`,
     '',
@@ -114,6 +177,12 @@ export function buildPrompt(draft: Draft) {
     '',
     `my team pick: ${withLanes(draft.picks.team)}`,
     '',
+    ...(damage
+      ? [
+          `enemy damage: ${damage.physical} physical, ${damage.magic} magic${damage.mixed ? `, ${damage.mixed} mixed` : ''}, so favour ${damage.lean} defense items`,
+          '',
+        ]
+      : []),
     'answer short, no paragraphs:',
     '- first line: Battle spell: <name>',
     '- second line: Emblem: <name> (<its 3 talents>)',
@@ -123,11 +192,11 @@ export function buildPrompt(draft: Draft) {
     '',
     ...(draft.lang === 'ms'
       ? [
-          'then 3 short lines, each starting with its label: Bantu dahulu:, Ult pada:, Syarat menang:',
-          ADVICE_MEANING,
+          asked,
+          meaning,
           'write in formal Malay (Bahasa Melayu); keep hero, item, spell and emblem names in English, and the labels Battle spell: and Emblem: as written',
         ]
-      : ['then 3 short lines, each starting with its label: Help first:, Ult on:, Win condition:', ADVICE_MEANING]),
+      : [asked, meaning]),
   ].join('\n');
 }
 

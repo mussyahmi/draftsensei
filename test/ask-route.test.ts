@@ -232,7 +232,8 @@ const stats = (url: string) => {
   if (url.includes('/heroes?size')) {
     return { data: { records: [hero(27, 'Sun'), hero(60, 'Tigreal'), hero(1, 'Franco'), hero(2, 'Akai'), hero(3, 'Diggie')] } };
   }
-  if (url.includes('/27/counters')) return table([[1, 0.01], [2, -0.02], [3, 0.031]]);
+  // The API's sign: how Sun does against each, so a good counter is negative.
+  if (url.includes('/27/counters')) return table([[1, -0.01], [2, 0.02], [3, -0.031]]);
   if (url.includes('/60/teammates')) return table([[1, 0.005], [2, 0.04]]);
   return null;
 };
@@ -256,7 +257,7 @@ test('a hero pick ask hands Gemini real counters for my lane', async () => {
     'diggie: +3.1% vs enemy (best into sun +3.1%), +0.0% with my team',
     'akai: -2.0% vs enemy, +4.0% with my team (best with tigreal +4.0%)',
     'franco: +1.0% vs enemy (best into sun +1.0%), +0.5% with my team (best with tigreal +0.5%)',
-    'choose the best 3 from this match data, counting both their win rate and the changes; in each reason name the enemy hero it counters best, or the teammate it combos with if that gain is bigger, in your own words',
+    'choose the best 3 from this match data, counting both their win rate and the changes; the player already sees these numbers, so no numbers or win rates in a reason: say what the hero does in this match, the ability or playstyle that stops a named enemy or helps a named teammate, and make each reason different from the others',
   ].join('\n'));
 });
 

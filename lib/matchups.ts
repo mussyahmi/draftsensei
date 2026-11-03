@@ -2,9 +2,10 @@
 // heroes for my lane do best against the enemy picks and beside my team.
 // Gemini still chooses and explains; this just stops it guessing at counters.
 
-import { HERO_LANES } from './heroes';
+import { HERO_LANES, HERO_OTHER_LANES } from './heroes';
 import { LANES, RANKS, type Lane, type Rank } from './draft';
 import { loadGains, loadMeta } from './arena';
+import { fillsGaps, GAP_BOOST, teamGaps, type Gap } from './team-balance';
 
 // Each hero's win rate change against or alongside one picked hero.
 export type Gains = Map<string, number>;
@@ -22,18 +23,23 @@ export type Ranked = {
   opponent?: { enemy: string; gain: number } | null;
   // Its win rate this week at my rank, before any matchup.
   win?: number;
+  // What my team is missing that this hero brings.
+  fills?: Gap[];
 };
 
-// With a pool, the pool is the whole field; without one, every hero whose
-// usual lane is mine. Either way a hero already picked cannot be picked again.
+// With a pool, the pool is the whole field; without one, every hero who
+// plays my lane, as their usual lane or another the game lists. Either way a hero already picked cannot be picked again.
 export function candidatesFor(
   lane: Lane,
   pool: string[],
   taken: string[],
   lanes: Partial<Record<string, Lane>> = HERO_LANES,
   bans: string[] = [],
+  others: Partial<Record<string, Lane[]>> = HERO_OTHER_LANES,
 ) {
-  const field = pool.length ? pool : Object.keys(lanes).filter((h) => lanes[h] === lane);
+  const field = pool.length
+    ? pool
+    : Object.keys(lanes).filter((h) => lanes[h] === lane || others[h]?.includes(lane));
   const gone = new Set([...taken, ...bans]);
   return field.filter((h) => !gone.has(h));
 }
@@ -50,20 +56,23 @@ const sum = (tables: Gains[], hero: string) =>
 // counts double in the ranking. The total shown stays a plain sum.
 // Gains are on top of how a hero usually does, so a hero losing most games
 // needs bigger counters to beat one already winning: the ranking starts from
-// its win rate at my rank. A hero with no win rate starts even.
+// its win rate at my rank. A hero with no win rate starts even. A hero that
+// brings what my team is missing moves up, without outranking a far better
+// matchup.
 export function rankPicks(
   candidates: string[],
   against: Map<string, Gains>,
   alongside: Map<string, Gains>,
   opponent?: string,
   wins: Map<string, number> = new Map(),
+  gaps: Gap[] = [],
 ): Ranked[] {
   const enemies = [...against.values()];
   const allies = [...alongside.values()];
   const tables = [...enemies, ...allies];
   const lane = opponent ? against.get(opponent) : undefined;
   const score = (r: Ranked) =>
-    (r.win ?? 0.5) - 0.5 + r.against + r.alongside + (r.opponent?.gain ?? 0);
+    (r.win ?? 0.5) - 0.5 + r.against + r.alongside + (r.opponent?.gain ?? 0) + GAP_BOOST * (r.fills?.length ?? 0);
   return candidates
     .filter((hero) => tables.some((t) => t.has(hero)))
     .map((hero) => ({
@@ -74,6 +83,7 @@ export function rankPicks(
       partner: bestWith(alongside, hero),
       opponent: lane && opponent ? { enemy: opponent, gain: lane.get(hero) ?? 0 } : null,
       ...(wins.has(hero) && { win: wins.get(hero) }),
+      ...(fillsGaps(hero, gaps).length > 0 && { fills: fillsGaps(hero, gaps) }),
     }))
     .sort((a, b) => score(b) - score(a));
 }
@@ -110,7 +120,8 @@ export function matchupLines(ranked: Ranked[], withTeam: boolean) {
       (r.best ? ` (best into ${r.best.enemy.toLowerCase()} ${percent(r.best.gain)})` : '') +
       (r.opponent ? `, vs lane opponent ${r.opponent.enemy.toLowerCase()} ${percent(r.opponent.gain)}` : '') +
       (withTeam ? `, ${percent(r.alongside)} with my team` : '') +
-      (withTeam && r.partner ? ` (best with ${r.partner.ally.toLowerCase()} ${percent(r.partner.gain)})` : ''),
+      (withTeam && r.partner ? ` (best with ${r.partner.ally.toLowerCase()} ${percent(r.partner.gain)})` : '') +
+      (r.fills?.length ? `, adds the ${r.fills.join(' and ')} my team is missing` : ''),
   );
 }
 
@@ -186,6 +197,7 @@ export async function rankedFor(
     new Map(alongside),
     picks.opponent,
     new Map(meta.map((m) => [m.hero, m.win])),
+    teamGaps(picks.team),
   ).slice(0, count);
   return { ranked, withTeam: alongside.length > 0 };
 }
@@ -195,10 +207,10 @@ export async function matchupData(picks: Picks): Promise<string[]> {
   return matchupLines(ranked, withTeam);
 }
 
-// The line on an instant pick, as how much more often it wins: its biggest
-// win into an enemy (the lane opponent on a tie, since that is the fight it
-// takes most), and the teammate it plays best beside, so a pick that is there
-// for a combo says so.
+// The line on an instant pick: its win rate when known, since the order starts
+// from it, then its biggest win into an enemy (the lane opponent on a tie, since
+// that is the fight it takes most), and the teammate it plays best beside, so a
+// pick that is there for a combo says so.
 export function pickReason(
   r: Ranked,
   words: { win: string; with: string } = { win: 'win', with: 'with' },
@@ -209,8 +221,8 @@ export function pickReason(
     into && [percent(into.gain), `vs ${into.enemy}`],
     r.partner && [percent(r.partner.gain), `${words.with} ${r.partner.ally}`],
   ].filter((p): p is string[] => Boolean(p));
-  // "+1.2% win vs Layla, +3.6% with Kaja": "win" once, on the first number.
-  return parts.length
-    ? parts.map(([n, who], i) => (i === 0 ? `${n} ${words.win} ${who}` : `${n} ${who}`)).join(', ')
-    : null;
+  const gains = (first: string) => parts.map(([n, who], i) => (i === 0 ? `${n}${first} ${who}` : `${n} ${who}`));
+  // "57.5% win, +1.2% vs Layla, +3.6% with Kaja": "win" once, on the first number.
+  if (r.win != null) return [`${(r.win * 100).toFixed(1)}% ${words.win}`, ...gains('')].join(', ');
+  return parts.length ? gains(` ${words.win}`).join(', ') : null;
 }

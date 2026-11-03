@@ -17,7 +17,8 @@ const stats = (url: string) => {
   if (url.includes('/heroes?size')) {
     return { data: { records: [hero(27, 'Sun'), hero(60, 'Tigreal'), hero(1, 'Franco'), hero(2, 'Akai'), hero(3, 'Diggie')] } };
   }
-  if (url.includes('/27/counters')) return table([[1, 0.01], [2, -0.02], [3, 0.031]]);
+  // The API's sign: how Sun does against each, so a good counter is negative.
+  if (url.includes('/27/counters')) return table([[1, -0.01], [2, 0.02], [3, -0.031]]);
   if (url.includes('/60/teammates')) return table([[1, 0.005], [2, 0.04]]);
   return null;
 };

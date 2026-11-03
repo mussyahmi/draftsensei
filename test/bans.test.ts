@@ -1,5 +1,5 @@
 import { test, expect, vi, afterEach } from 'vitest';
-import { banReason, metaFrom, suggestBans, winsBy } from '../lib/bans';
+import { banReason, metaFrom, suggestBans, threatGain, winsBy, withThreats } from '../lib/bans';
 import { GET } from '../app/api/bans/route';
 import { forgetArena } from '../lib/arena';
 
@@ -89,4 +89,66 @@ test('win rates are looked up by hero name', () => {
     { hero: 'Layla', win: 0.48, ban: 0 },
   ]);
   expect(wins).toEqual({ Nana: 0.53, Layla: 0.48 });
+});
+
+const three = [
+  { hero: 'Masha', win: 0.56, ban: 0 },
+  { hero: 'Gloo', win: 0.55, ban: 0 },
+  { hero: 'Argus', win: 0.53, ban: 0 },
+];
+
+test('a hero beating one of mine moves up and names who it beats', () => {
+  const out = withThreats(three, [['Valir', new Map([['Argus', 0.04]])]]);
+  expect(out.map((m) => m.hero)).toEqual(['Argus', 'Masha', 'Gloo']);
+  expect(out[0].threat).toEqual({ hero: 'Valir', gain: 0.04 });
+});
+
+test('with several of mine, only the hardest counter counts', () => {
+  const out = withThreats(three, [
+    ['Valir', new Map([['Argus', 0.02]])],
+    ['Nana', new Map([['Argus', 0.03]])],
+  ]);
+  expect(out.find((m) => m.hero === 'Argus')!.threat).toEqual({ hero: 'Nana', gain: 0.03 });
+});
+
+test('a tiny edge or a losing matchup names nobody and moves nothing', () => {
+  const out = withThreats(three, [['Valir', new Map([['Argus', 0.015], ['Gloo', -0.03]])]]);
+  expect(out.map((m) => m.hero)).toEqual(['Masha', 'Gloo', 'Argus']);
+  expect(out.every((m) => !m.threat)).toBe(true);
+});
+
+test('a hero of mine is not a threat to itself', () => {
+  const out = withThreats(three, [['Gloo', new Map([['Gloo', 0.09]])]]);
+  expect(out.find((m) => m.hero === 'Gloo')!.threat).toBeUndefined();
+});
+
+test('with no heroes of mine, bans stay as they were', () => {
+  expect(withThreats(three, [])).toEqual(three);
+});
+
+test('the route adds threats for the heroes I play, and ignores made-up names', async () => {
+  const urls: string[] = [];
+  vi.stubGlobal('fetch', async (url: string) => {
+    urls.push(url);
+    if (url.includes('/heroes/rank')) return new Response(JSON.stringify(page));
+    if (url.includes('/heroes?size')) {
+      const hero = (hero_id: number, name: string) => ({ data: { hero_id, hero: { data: { name } } } });
+      return new Response(JSON.stringify({ data: { records: [hero(5, 'Nana'), hero(9, 'Layla')] } }));
+    }
+    if (url.includes('/5/counters')) {
+      return new Response(JSON.stringify({
+        data: { records: [{ data: { sub_hero: [{ heroid: 9, increase_win_rate: -0.2 }] } }] },
+      }));
+    }
+    return new Response('{}');
+  });
+  const res = await GET(new Request('http://x/api/bans?rank=all&mine=Nana&mine=Made+Up'));
+  const body = await res.json();
+  expect(body[0].hero).toBe('Layla');
+  expect(body[0].threat).toEqual({ hero: 'Nana', gain: 0.2 });
+  expect(urls.filter((u) => u.includes('/counters'))).toHaveLength(1);
+});
+
+test('a threat reads as a signed percentage', () => {
+  expect(threatGain(0.03)).toBe('+3.0%');
 });

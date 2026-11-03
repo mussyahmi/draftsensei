@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         '',
         'match data from ranked games for heroes who play my lane: their win rate at my rank, then how much it changes against the enemy and with my team:',
         ...lines,
-        'choose the best 3 from this match data, counting both their win rate and the changes; in each reason name the enemy hero it counters best, or the teammate it combos with if that gain is bigger, in your own words',
+        'choose the best 3 from this match data, counting both their win rate and the changes; the player already sees these numbers, so no numbers or win rates in a reason: say what the hero does in this match, the ability or playstyle that stops a named enemy or helps a named teammate, and make each reason different from the others',
       ].join('\n');
     }
   }

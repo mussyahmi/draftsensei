@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
 import { HeroEntry } from '@/components/hero-entry';
-import { banReason, suggestBans, type MetaHero } from '@/lib/bans';
+import { banReason, suggestBans, threatGain, type MetaHero } from '@/lib/bans';
+import { LANES, type Lane } from '@/lib/draft';
+import { playsLane } from '@/lib/heroes';
 import { useT } from '@/components/lang';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +25,10 @@ type Props = {
 export function BanList({ bans, unavailable, portraits, meta, onChange }: Props) {
   const t = useT();
   const full = bans.length >= 10;
-  const suggested = full ? [] : suggestBans(meta, unavailable);
+  // Which lane's threats to look at; the hero I fear may not be in my lane.
+  const [lane, setLane] = useState<Lane | 'all'>('all');
+  const inLane = lane === 'all' ? meta : meta.filter((m) => playsLane(m.hero, lane));
+  const suggested = full ? [] : suggestBans(inLane, unavailable);
   return (
     <div className="space-y-2">
       {bans.length < 10 && (
@@ -67,10 +73,30 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
         </div>
       )}
       {/* No asking needed: the strongest heroes this week, one tap each. */}
-      {suggested.length > 0 && (
+      {!full && meta.length > 0 && (
         <div className="space-y-2 pt-2">
-          <p className="text-xs text-muted-foreground">{t.strongest}</p>
-          <div className="flex flex-wrap gap-1.5">
+          {/* Once counters to my heroes are in the list, not all of it is the
+              strongest of the week. */}
+          <p className="text-xs text-muted-foreground">
+            {suggested.some((m) => m.threat) ? t.suggestedBans : t.strongest}
+          </p>
+          <div className="grid grid-cols-6 gap-1 sm:flex">
+            {(['all', ...LANES.map((l) => l.key)] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={lane === key}
+                onClick={() => setLane(key)}
+                className={cn(
+                  'min-h-9 rounded-md px-1 font-display text-xs uppercase tracking-wide sm:px-3',
+                  lane === key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {key === 'all' ? t.allLanes : key}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5 pt-2">
             {suggested.map((m) => (
               <button
                 key={m.hero}
@@ -88,6 +114,7 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
                 {/* On a phone the win rate alone, so two or three fit a line. */}
                 <span className="text-xs text-muted-foreground sm:hidden">{t.banShort(Math.round(m.win * 100))}</span>
                 <span className="hidden text-xs text-muted-foreground sm:inline">{banReason(m, t.banReason)}</span>
+                {m.threat && <span className="text-xs text-primary">{t.vsYour(threatGain(m.threat.gain), m.threat.hero)}</span>}
               </button>
             ))}
           </div>

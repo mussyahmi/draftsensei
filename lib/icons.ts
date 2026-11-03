@@ -16,7 +16,8 @@ export function itemOf(line: string): string | null {
   const spell = line.match(/battle spell\W*?:\**\s*(.+)$/i);
   if (spell) return nameOf(spell[1]);
   const emblem = line.match(/emblem\W*?:\**\s*(.+)$/i);
-  if (emblem) return nameOf(emblem[1]);
+  // Gemini sometimes writes "Tank Emblem", while the icons go by "Tank".
+  if (emblem) return nameOf(emblem[1])?.replace(/\s+emblem$/i, '') ?? null;
   const item = itemLine(line);
   if (item) return nameOf(item[1]);
   // Gemini sometimes writes the spell as a bare bullet, "- Flicker". Any
@@ -63,12 +64,22 @@ export function buildBlocks(text: string): Block[] {
 // written after it. Lines about no hero, like a preamble, are dropped.
 export function picksOf(text: string, heroes: string[]): { hero: string; reason: string }[] {
   const seen = new Set<string>();
-  return text.split('\n').flatMap((line) => {
+  const picks: { hero: string; reason: string }[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const clean = line.replace(/\*\*/g, '').replace(/^\s*(?:[*-]\s+)?(?:\d+[.)]\s+)?/, '').trim();
     const hero = heroOf(line, heroes);
-    if (!hero || seen.has(hero)) return [];
+    const rest = hero ? clean.slice(hero.length) : '';
+    const last = picks[picks.length - 1];
+    // Gemini sometimes puts a reason on the line under the name. That line may
+    // open with an enemy's name, which only a separator would make a new pick.
+    if (last && !last.reason && (!hero || (rest.trim() && !/^\s*[:\-\u2013\u2014]/.test(rest)))) {
+      last.reason = clean;
+      continue;
+    }
+    if (!hero || seen.has(hero)) continue;
     seen.add(hero);
-    const clean = line.replace(/\*\*/g, '').replace(/^\s*(?:[*-]\s+)?(?:\d+[.)]\s+)?/, '');
-    const reason = clean.slice(hero.length).replace(/^\s*[:\-\u2013\u2014]\s*/, '').trim();
-    return [{ hero, reason }];
-  });
+    picks.push({ hero, reason: rest.replace(/^\s*[:\-\u2013\u2014]\s*/, '').trim() });
+  }
+  return picks;
 }

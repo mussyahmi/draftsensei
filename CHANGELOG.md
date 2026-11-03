@@ -6,6 +6,31 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.7.0] - 2026-11-03
+
+### Fixed
+- Counter numbers were backwards: a hero shown as good into an enemy was really the one that enemy beats. Suggested picks, Ask AI to choose and ban suggestions now use them the right way round.
+- An emblem the AI writes as "Tank Emblem" shows its icon.
+- The lane warning no longer says two heroes when there are three or more.
+- Build tips no longer name an enemy under Help first when no teammate has been entered yet.
+
+### Changed
+- Hero suggestions show five on a laptop or tablet. Phones keep three.
+- Every hero suggestion shows its win rate, so the order explains itself.
+- Ask AI to choose says what each hero does in this match instead of repeating the numbers.
+- A hero you type in starts in the first lane the game lists for it, so Selena starts in MID. Tap the lane to change it.
+
+### Added
+- Draft check: once both teams are full, a card shows your lane matchup, team win rates, counters, best combo and damage split.
+- Picks can show the best heroes for the other open lanes, to help a teammate choose. Tap one to add it to your team.
+- Ban suggestions can be filtered by lane.
+- Hero search forgives typos and knows short names: yss finds Yi Sun-shin, pk finds Popol and Kupa, gunevere finds Guinevere.
+- With heroes in My heroes for your lane, ban suggestions move up what counters them and show by how much.
+- Suggested picks include heroes in every lane the game lists them, so Selena now shows up for MID as well as ROAM.
+- My build says when the enemy team leans physical or magic, and which defense is worth more. Adjust for enemy team uses the same count.
+- With three or four heroes on your team, My team warns if there is no tank yet or only one kind of damage.
+- Suggested picks move up a hero that brings what your team is missing, and say so when that sets it apart from the others shown.
+
 ## [0.6.0] - 2026-11-02
 
 ### Added

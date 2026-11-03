@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { candidatesFor, rankPicks, matchupLines, type Gains } from '../lib/matchups';
+import { candidatesFor, pickReason, rankPicks, matchupLines, type Gains } from '../lib/matchups';
 
 // How much each hero's win rate moves against or alongside one picked hero.
 const vsSun: Gains = new Map([['Jawhead', 0.039], ['Saber', 0.031], ['Natan', -0.052]]);
@@ -39,7 +39,7 @@ test('a hero with no data at all is left out rather than shown as neutral', () =
 
 test('candidates are heroes who play my lane, minus anyone already picked', () => {
   const lanes = { Jawhead: 'jungle', Saber: 'jungle', Sun: 'exp', Natan: 'gold' } as const;
-  expect(candidatesFor('jungle', [], ['Saber'], lanes)).toEqual(['Jawhead']);
+  expect(candidatesFor('jungle', [], ['Saber'], lanes, [], {})).toEqual(['Jawhead']);
 });
 
 test('with a hero pool, only the pool is in the running', () => {
@@ -82,7 +82,7 @@ test('with no enemy in my lane yet, nobody is weighted', () => {
 
 test('a banned hero is not in the running', () => {
   const lanes = { Jawhead: 'jungle', Saber: 'jungle' } as const;
-  expect(candidatesFor('jungle', [], [], lanes, ['Saber'])).toEqual(['Jawhead']);
+  expect(candidatesFor('jungle', [], [], lanes, ['Saber'], {})).toEqual(['Jawhead']);
 });
 
 test('a hero already winning more beats a weaker one with slightly bigger counters', () => {
@@ -103,4 +103,12 @@ test('a hero with no win rate is ranked as if it wins half its games', () => {
 test('Gemini sees each hero win rate at my rank before its matchups', () => {
   expect(matchupLines([{ hero: 'Saber', against: 0.051, alongside: 0, best: null, win: 0.523 }], false))
     .toEqual(['saber: 52.3% win at my rank, +5.1% vs enemy']);
+});
+
+test('a chip leads with the win rate, so every hero has a number and the order explains itself', () => {
+  const base = { hero: 'Marcel', against: 0, alongside: 0, best: null, win: 0.575 };
+  expect(pickReason(base)).toBe('57.5% win');
+  expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 } })).toBe('57.5% win, +0.2% vs Masha');
+  expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 }, partner: { ally: 'Kaja', gain: 0.036 } }, { win: 'menang', with: 'bersama' }))
+    .toBe('57.5% menang, +0.2% vs Masha, +3.6% bersama Kaja');
 });
