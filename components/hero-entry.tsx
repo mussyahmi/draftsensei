@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { HEROES } from '@/lib/heroes';
-import { searchHeroes } from '@/lib/draft';
+import { heroListPlace, searchHeroes } from '@/lib/draft';
 import { GameImage } from '@/components/game-image';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -37,13 +37,46 @@ export function HeroEntry({
   const [cursor, setCursor] = useState(0);
   const input = useRef<HTMLElement>(null);
 
+  const [place, setPlace] = useState({ up: false, maxHeight: 0 });
+  const rows = useRef(0);
+
+  // On a phone the keyboard covers the lower half of the page, and a list
+  // opening under a low box would sit behind it. The visual viewport is the
+  // part still showing; inside a dialog, the dialog's edges clip the list too.
+  const measure = useCallback(() => {
+    const box = input.current?.getBoundingClientRect();
+    if (!box) return;
+    const view = window.visualViewport;
+    const frame = input.current?.closest('[role="dialog"]')?.getBoundingClientRect();
+    const top = Math.max(view?.offsetTop ?? 0, frame?.top ?? 0);
+    const bottom = Math.min(
+      (view?.offsetTop ?? 0) + (view?.height ?? window.innerHeight),
+      frame?.bottom ?? Infinity,
+    );
+    setPlace(heroListPlace(rows.current, bottom - box.bottom, box.top - top));
+  }, []);
+
+  // The keyboard finishes opening after the box has focus.
+  useEffect(() => {
+    const view = window.visualViewport;
+    view?.addEventListener('resize', measure);
+    view?.addEventListener('scroll', measure);
+    return () => {
+      view?.removeEventListener('resize', measure);
+      view?.removeEventListener('scroll', measure);
+    };
+  }, [measure]);
+
   const matches = query ? searchHeroes(query, HEROES, unavailable).slice(0, MAX) : [];
 
   const choose = (hero: string) => {
     setQuery('');
     setCursor(0);
     onChoose(hero);
-    input.current?.focus();
+    // With a keyboard and mouse, the next name can be typed straight away. On a
+    // phone that would hold the on-screen keyboard over what the pick just changed.
+    if (window.matchMedia('(pointer: fine)').matches) input.current?.focus();
+    else input.current?.blur();
   };
 
   // Focus is a head start with a keyboard and mouse. On a phone it pops the
@@ -60,7 +93,10 @@ export function HeroEntry({
         autoComplete="off"
         spellCheck={false}
         placeholder={placeholder ?? t.typeHero}
+        onFocus={measure}
         onValueChange={(next) => {
+          rows.current = Math.min(searchHeroes(next, HEROES, unavailable).length, MAX);
+          measure();
           setQuery(next);
           setCursor(0);
         }}
@@ -83,7 +119,13 @@ export function HeroEntry({
       />
 
       {matches.length > 0 && (
-        <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-xl">
+        <ul
+          style={{ maxHeight: place.maxHeight || undefined }}
+          className={cn(
+            'absolute z-30 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-xl',
+            place.up ? 'bottom-full mb-1' : 'mt-1',
+          )}
+        >
           {matches.map((hero, i) => (
             <li key={hero}>
               <button

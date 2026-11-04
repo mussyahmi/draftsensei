@@ -8,7 +8,7 @@ import { banReason, suggestBans, threatGain, type MetaHero } from '@/lib/bans';
 import { LANES, type Lane } from '@/lib/draft';
 import { playsLane } from '@/lib/heroes';
 import { useT } from '@/components/lang';
-import { cn } from '@/lib/utils';
+import { chipOff, chipOn, cn } from '@/lib/utils';
 
 type Props = {
   bans: string[];
@@ -89,7 +89,7 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
                 onClick={() => setLane(key)}
                 className={cn(
                   'min-h-9 rounded-md px-1 font-display text-xs uppercase tracking-wide sm:px-3',
-                  lane === key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground',
+                  lane === key ? chipOn : chipOff,
                 )}
               >
                 {key === 'all' ? t.allLanes : key}

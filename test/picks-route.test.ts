@@ -33,7 +33,29 @@ test('the best three for my lane come back from match data alone', async () => {
   expect(ranked.map((r: { hero: string }) => r.hero)).toEqual(['Diggie', 'Akai', 'Franco']);
 });
 
-test('an empty board has nothing to rank', async () => {
+test('an empty board ranks my lane by win rate, so the first picker gets suggestions', async () => {
+  const record = (name: string, win: number) => ({
+    data: { main_hero: { data: { name } }, main_hero_win_rate: win, main_hero_ban_rate: 0 },
+  });
+  const meta = { data: { records: [record('Franco', 0.48), record('Diggie', 0.55), record('Akai', 0.51), record('Layla', 0.6)] } };
+  vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(url.includes('/heroes/rank') ? meta : stats(url))));
+  const ranked = await (await post({ picks: { lane: 'roam', enemy: [], team: [], pool: [] } })).json();
+  expect(ranked.map((r: { hero: string }) => r.hero)).toEqual(['Diggie', 'Akai', 'Franco']);
+  expect(pickReason(ranked[0])).toBe('55.0% win');
+});
+
+test('an empty board with a list of mine ranks only that list', async () => {
+  const record = (name: string, win: number) => ({
+    data: { main_hero: { data: { name } }, main_hero_win_rate: win, main_hero_ban_rate: 0 },
+  });
+  const meta = { data: { records: [record('Franco', 0.48), record('Diggie', 0.55), record('Akai', 0.51)] } };
+  vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify(url.includes('/heroes/rank') ? meta : stats(url))));
+  const ranked = await (await post({ picks: { lane: 'roam', enemy: [], team: [], pool: ['Franco', 'Akai'] } })).json();
+  expect(ranked.map((r: { hero: string }) => r.hero)).toEqual(['Akai', 'Franco']);
+});
+
+test('an empty board with no win rates has nothing to rank', async () => {
+  vi.stubGlobal('fetch', async () => new Response('down', { status: 503 }));
   const res = await post({ picks: { lane: 'roam', enemy: [], team: [], pool: [] } });
   expect(await res.json()).toEqual([]);
 });

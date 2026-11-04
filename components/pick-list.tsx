@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { laneClashes, type Lane, type Pick } from '@/lib/draft';
+import { offLane } from '@/lib/team-balance';
 import { GameImage } from '@/components/game-image';
 import { LaneMenu } from '@/components/lane-menu';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,18 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me, onClear
   const t = useT();
   // My own hero counts: two of us in one lane is as wrong as two teammates.
   const clashes = laneClashes(rows);
+  // Only my own team's lanes are mine to fix.
+  const astray = side === 'team' ? offLane(rows).map((o) => o.hero) : [];
+  // Everyone else's lane, as this row's menu should show it.
+  const takenFor = (hero: string) => {
+    const taken: Partial<Record<Lane, string>> = {};
+    for (const r of rows) {
+      if (r.hero === hero) continue;
+      const name = r.me ? `${r.hero} (${t.you})` : r.hero;
+      taken[r.lane] = taken[r.lane] ? `${taken[r.lane]}, ${name}` : name;
+    }
+    return taken;
+  };
 
   return (
     <div className="space-y-2">
@@ -75,15 +88,20 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me, onClear
               >
                 {pick.hero}
                 {pick.me && (
-                  <span className="ms-1.5 rounded bg-primary px-1.5 py-0.5 align-middle font-sans text-xs font-semibold uppercase text-primary-foreground">
+                  <span className="ms-1.5 rounded bg-primary/15 px-1.5 py-0.5 align-middle font-sans text-xs font-semibold uppercase text-primary">
                     {t.you}
                   </span>
                 )}
               </span>
               {pick.onLane ? (
-                <LaneMenu value={pick.lane} onChange={pick.onLane} />
+                <LaneMenu
+                  value={pick.lane}
+                  warn={clashes.includes(pick.lane) || astray.includes(pick.hero)}
+                  taken={takenFor(pick.hero)}
+                  onChange={pick.onLane}
+                />
               ) : (
-                <span className="inline-flex h-8 items-center rounded-md bg-primary px-2.5 font-display text-xs uppercase tracking-wide text-primary-foreground sm:h-7">
+                <span className="inline-flex h-9 items-center rounded-md bg-secondary px-2.5 font-display text-xs uppercase tracking-wide text-secondary-foreground sm:h-7">
                   {pick.lane}
                 </span>
               )}
@@ -95,7 +113,7 @@ export function PickList({ picks, onLane, onRemove, side, portraits, me, onClear
                   aria-label={t.remove(pick.hero)}
                   title={t.remove(pick.hero)}
                   onClick={pick.onRemove}
-                  className="size-8 shrink-0 text-muted-foreground hover:text-destructive sm:size-6"
+                  className="size-9 shrink-0 text-muted-foreground hover:text-destructive sm:size-6"
                 >
                   <X className="size-3.5" />
                 </Button>

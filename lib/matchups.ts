@@ -23,6 +23,9 @@ export type Ranked = {
   opponent?: { enemy: string; gain: number } | null;
   // Its win rate this week at my rank, before any matchup.
   win?: number;
+  // On an empty board, its hardest counter still open to the enemy, as how much
+  // it loses there. Null means nothing really counters it.
+  worst?: { enemy: string; gain: number } | null;
   // What my team is missing that this hero brings.
   fills?: Gap[];
 };
@@ -86,6 +89,38 @@ export function rankPicks(
       ...(fillsGaps(hero, gaps).length > 0 && { fills: fillsGaps(hero, gaps) }),
     }))
     .sort((a, b) => score(b) - score(a));
+}
+
+// The enemy answers a first pick, so a hero that wins a lot but folds to one
+// counter is a risk. Each hero's table says how much every other hero gains
+// against it. Heroes whose table did not load go last, in win rate order.
+export function safeRanked(
+  candidates: string[],
+  wins: Map<string, number>,
+  counters: Map<string, Gains>,
+  gone: Set<string> = new Set(),
+): Ranked[] {
+  const worstOf = (hero: string, table: Gains): Ranked['worst'] => {
+    const open = [...table].filter(([name, gain]) => name !== hero && !gone.has(name) && gain > 0);
+    if (!open.length) return null;
+    const [enemy, gain] = open.reduce((a, b) => (b[1] > a[1] ? b : a));
+    return { enemy, gain: 0 - gain };
+  };
+  const score = (r: Ranked) => (r.win ?? 0) + (r.worst?.gain ?? 0);
+  return candidates
+    .filter((hero) => wins.has(hero))
+    .map((hero) => {
+      const table = counters.get(hero);
+      return {
+        hero,
+        against: 0,
+        alongside: 0,
+        best: null,
+        win: wins.get(hero),
+        ...(table && { worst: worstOf(hero, table) }),
+      };
+    })
+    .sort((a, b) => Number(b.worst !== undefined) - Number(a.worst !== undefined) || score(b) - score(a));
 }
 
 // Only a real gain counts as a counter or a partner; doing least badly
@@ -161,6 +196,10 @@ export function picksFrom(v: unknown): Picks | null {
   };
 }
 
+// How many of the lane's strongest get their counters looked up on an empty
+// board: each is a request to a data source that rate-limits.
+const SAFE_POOL = 8;
+
 // The few heroes worth naming; more than this and the prompt drowns the picks.
 const SHOWN = 8;
 
@@ -176,8 +215,17 @@ export async function rankedFor(
   picks: Picks,
   count = SHOWN,
 ): Promise<{ ranked: Ranked[]; withTeam: boolean }> {
-  if (!picks.enemy.length && !picks.team.length) return { ranked: [], withTeam: false };
   const rank = picks.rank ?? 'all';
+  if (!picks.enemy.length && !picks.team.length) {
+    const meta = await loadMeta(rank).catch(() => []);
+    const wins = new Map(meta.map((m) => [m.hero, m.win]));
+    const strongest = candidatesFor(picks.lane, picks.pool, [], HERO_LANES, picks.bans)
+      .filter((h) => wins.has(h))
+      .sort((a, b) => wins.get(b)! - wins.get(a)!)
+      .slice(0, SAFE_POOL);
+    const counters = new Map(await loaded(strongest, 'counters', rank));
+    return { ranked: safeRanked(strongest, wins, counters, new Set(picks.bans)).slice(0, count), withTeam: false };
+  }
   // Without win rates the matchups alone still rank the heroes.
   const [against, alongside, meta] = await Promise.all([
     loaded(picks.enemy, 'counters', rank),
@@ -203,6 +251,8 @@ export async function rankedFor(
 }
 
 export async function matchupData(picks: Picks): Promise<string[]> {
+  // No picks means no matchups to hand Gemini, only numbers that look measured.
+  if (!picks.enemy.length && !picks.team.length) return [];
   const { ranked, withTeam } = await rankedFor(picks);
   return matchupLines(ranked, withTeam);
 }
@@ -213,7 +263,7 @@ export async function matchupData(picks: Picks): Promise<string[]> {
 // pick that is there for a combo says so.
 export function pickReason(
   r: Ranked,
-  words: { win: string; with: string } = { win: 'win', with: 'with' },
+  words: { win: string; with: string; worst: string } = { win: 'win', with: 'with', worst: 'worst vs' },
 ): string | null {
   const lane = r.opponent && r.opponent.gain > 0 ? r.opponent : null;
   const into = lane && (!r.best || lane.gain >= r.best.gain) ? lane : r.best;
@@ -223,6 +273,12 @@ export function pickReason(
   ].filter((p): p is string[] => Boolean(p));
   const gains = (first: string) => parts.map(([n, who], i) => (i === 0 ? `${n}${first} ${who}` : `${n} ${who}`));
   // "57.5% win, +1.2% vs Layla, +3.6% with Kaja": "win" once, on the first number.
-  if (r.win != null) return [`${(r.win * 100).toFixed(1)}% ${words.win}`, ...gains('')].join(', ');
+  if (r.win != null) {
+    return [
+      `${(r.win * 100).toFixed(1)}% ${words.win}`,
+      ...gains(''),
+      ...(r.worst ? [`${words.worst} ${r.worst.enemy} ${percent(r.worst.gain)}`] : []),
+    ].join(', ');
+  }
   return parts.length ? gains(` ${words.win}`).join(', ') : null;
 }

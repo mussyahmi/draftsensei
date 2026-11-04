@@ -103,6 +103,21 @@ export function searchHeroes(query: string, heroes: string[], taken: string[] = 
     .map((m) => m.hero);
 }
 
+// One row at a thumb's height, plus the list's gap from the box.
+const HERO_ROW = 44;
+const LIST_GAP = 8;
+
+/**
+ * Where a list of matches goes: below if it fits, otherwise on the roomier side.
+ * It may only get what that side has, or it runs off the screen.
+ */
+export function heroListPlace(rows: number, below: number, above: number) {
+  const needed = rows * HERO_ROW + LIST_GAP;
+  const up = below < needed && above > below;
+  const room = Math.max((up ? above : below) - LIST_GAP, HERO_ROW);
+  return { up, maxHeight: Math.min(room, needed - LIST_GAP) };
+}
+
 export const LANES: { key: Lane; label: string }[] = [
   { key: 'exp', label: 'exp lane' },
   { key: 'mid', label: 'mid lane' },
@@ -139,7 +154,7 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
     ...(draft.bans.length ? [`banned: ${draft.bans.map((h) => h.toLowerCase()).join(', ')}`, ''] : []),
     'answer with hero names, one line each as hero: reason, the reason 10 words max',
     'do not suggest a hero already picked by either team',
-    ...(draft.lang === 'ms' ? ['write the reasons in formal Malay (Bahasa Melayu), hero names in English'] : []),
+    ...(WRITE_IN[draft.lang] ? [`write the reasons in ${WRITE_IN[draft.lang]}, hero names in English`] : []),
     ...(mine.length
       ? ['', `only suggest from my heroes: ${mine.map((h) => h.toLowerCase()).join(', ')}`]
       : []),
@@ -151,6 +166,19 @@ export function pickPrompt(draft: Draft, pool?: Pool) {
 const BLESSINGS: Partial<Record<Lane, string>> = {
   roam: 'roam blessing',
   jungle: 'jungle blessing',
+};
+
+// Which language Gemini is told to answer in; English needs no telling.
+const WRITE_IN: Record<Lang, string | null> = {
+  en: null,
+  ms: 'formal Malay (Bahasa Melayu)',
+  id: 'Indonesian (Bahasa Indonesia)',
+};
+
+const ADVICE_LABELS: Record<Lang, { help: string; ult: string; win: string }> = {
+  en: { help: 'Help first:', ult: 'Ult on:', win: 'Win condition:' },
+  ms: { help: 'Bantu dahulu:', ult: 'Ult pada:', win: 'Syarat menang:' },
+  id: { help: 'Bantu dulu:', ult: 'Ult ke:', win: 'Syarat menang:' },
 };
 
 // Gemini read "help first" as "deal with first" and named an enemy, so spell
@@ -166,9 +194,8 @@ export function buildPrompt(draft: Draft) {
   const damage = enemyDamage(draft.picks.enemy.map((p) => p.hero));
   const teammates = draft.picks.team.some((p) => p.hero !== draft.myHero);
   const meaning = teammates ? ADVICE_MEANING : ADVICE_NO_TEAM;
-  const labels = draft.lang === 'ms'
-    ? [...(teammates ? ['Bantu dahulu:'] : []), 'Ult pada:', 'Syarat menang:']
-    : [...(teammates ? ['Help first:'] : []), 'Ult on:', 'Win condition:'];
+  const words = ADVICE_LABELS[draft.lang];
+  const labels = [...(teammates ? [words.help] : []), words.ult, words.win];
   const asked = `then ${labels.length} short lines, each starting with its label: ${labels.join(', ')}`;
   return [
     `suggest mobile legends spell and item build for ${(draft.myHero || '...').toLowerCase()} (${laneLabel(draft.myLane)})`,
@@ -190,15 +217,19 @@ export function buildPrompt(draft: Draft) {
     '- order them by when to buy',
     ...(blessing ? [`- boots first, and name which ${blessing} to put on them`] : []),
     '',
-    ...(draft.lang === 'ms'
+    asked,
+    meaning,
+    ...(WRITE_IN[draft.lang]
       ? [
-          asked,
-          meaning,
-          'write in formal Malay (Bahasa Melayu); keep hero, item, spell and emblem names in English, and the labels Battle spell: and Emblem: as written',
+          `write in ${WRITE_IN[draft.lang]}; keep hero, item, spell and emblem names in English, and the labels Battle spell: and Emblem: as written`,
         ]
-      : [asked, meaning]),
+      : []),
   ].join('\n');
 }
+
+/** Whether there is anything on the board that clearing it would lose. */
+export const isEmptyDraft = (draft: Draft) =>
+  !draft.myHero && !draft.bans.length && !draft.picks.team.length && !draft.picks.enemy.length;
 
 export const newDraft = (): Draft => ({
   myLane: 'mid',
@@ -219,6 +250,19 @@ export function takenHeroes(draft: Draft) {
 }
 
 // Two heroes in the same lane means one of the auto-assigned lanes is wrong.
+/**
+ * Moves one pick to a lane. A hero already there takes the lane it left, so a
+ * wrong guess is fixed in one tap rather than leaving two heroes in one lane.
+ */
+export function moveToLane(picks: Pick[], index: number, lane: Lane): Pick[] {
+  const from = picks[index]?.lane;
+  const other = picks.findIndex((p, i) => i !== index && p.lane === lane);
+  return picks.map((p, i) => {
+    if (i === index) return { ...p, lane };
+    return i === other && from ? { ...p, lane: from } : p;
+  });
+}
+
 export function laneClashes(picks: Pick[]): Lane[] {
   const seen = picks.map((p) => p.lane);
   return LANES

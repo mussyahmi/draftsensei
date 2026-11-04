@@ -26,7 +26,7 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
   const t = useT();
   if (!account) {
     return (
-      <Button variant="ghost" size="sm" onClick={onSignIn}>
+      <Button variant="ghost" size="sm" className="h-9 sm:h-7" onClick={onSignIn}>
         <LogIn className="size-3.5" />
         {t.signIn}
       </Button>
@@ -45,7 +45,7 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
             variant="ghost"
             size="sm"
             aria-label={account.email ?? t.signedIn}
-            className="max-w-48"
+            className="h-9 max-w-48 sm:h-7"
           >
             {busy ? (
               <Loader2 className="size-3.5 animate-spin" />

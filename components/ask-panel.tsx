@@ -143,6 +143,7 @@ export function AskPanel({
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <Button
+          variant={blocked !== null ? 'secondary' : 'default'}
           onClick={onAsk}
           disabled={loading || blocked !== null}
           size="lg"

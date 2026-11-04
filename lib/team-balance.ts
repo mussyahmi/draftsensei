@@ -1,6 +1,8 @@
 // What my team still needs, from the heroes on it so far. Two heroes say too
 // little to warn about, and a full team can no longer change.
 
+import type { Lane, Pick } from './draft';
+import { HERO_LANES, playsLane } from './heroes';
 import { HERO_PROFILES, type HeroProfile } from './hero-profiles';
 
 export type Gap = 'tank' | 'magic' | 'physical';
@@ -55,4 +57,16 @@ export function enemyDamage(enemy: string[], profiles: Record<string, HeroProfil
   const lean = physical > magic ? 'physical' : 'magic';
   const [more, fewer] = lean === 'physical' ? [physical, magic] : [magic, physical];
   return more >= MIN_TO_JUDGE && more - fewer >= 2 ? { physical, magic, mixed, lean } : null;
+}
+
+/**
+ * Heroes put in a lane the game does not list them for. A support in EXP farms
+ * and fights like a support, so the team is short a real laner. A hero with no
+ * known lane raises no alarm.
+ */
+export function offLane(picks: Pick[]): { hero: string; lane: Lane; usual: Lane }[] {
+  return picks.flatMap(({ hero, lane }) => {
+    const usual = HERO_LANES[hero];
+    return usual && !playsLane(hero, lane) ? [{ hero, lane, usual }] : [];
+  });
 }

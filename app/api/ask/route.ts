@@ -76,6 +76,7 @@ export async function POST(request: Request) {
         `${shown.spell}, ${shown.emblem} emblem (${shown.talents.join(', ')})`.toLowerCase(),
         `items: ${shown.items.join(', ')}`.toLowerCase(),
         'adjust it for this enemy team: keep its battle spell, emblem and talents, keep every item that still fits, and swap only the items this enemy team calls for',
+        'once all 6 items are listed, for each item you swapped in, add one line with no number or bullet, as item name: the enemy it is for, 6 words max; no such line for an item you kept',
       ].join('\n');
     } else if (lines.length) {
       asking = [

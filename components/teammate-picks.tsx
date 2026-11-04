@@ -5,7 +5,8 @@ import { PickSuggestions } from '@/components/pick-suggestions';
 import { useT } from '@/components/lang';
 import { LANES, type Lane } from '@/lib/draft';
 import type { Picks, Ranked } from '@/lib/matchups';
-import { cn } from '@/lib/utils';
+import { retryUntil } from '@/lib/retry';
+import { chipOff, chipOn, cn } from '@/lib/utils';
 
 type Props = {
   // The board as my own suggestions see it.
@@ -29,23 +30,24 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
 
   useEffect(() => {
     if (!asked) return;
-    let current = true;
+    const board = JSON.parse(asked) as Picks;
+    const empty = !board.enemy.length && !board.team.length;
+    let stop = () => {};
     const timer = setTimeout(() => {
-      fetch('/api/picks', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ picks: JSON.parse(asked) }),
-      })
-        .then((r) => (r.ok ? r.json() : []))
-        .then((ranked: Ranked[]) => {
-          if (current) setAnswer({ asked, ranked });
-        })
-        .catch(() => {
-          /* no suggestions for this lane; typing a hero still works */
-        });
+      stop = retryUntil<Ranked[]>(
+        () =>
+          fetch('/api/picks', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ picks: board }),
+          }).then((r) => (r.ok ? r.json() : [])),
+        [],
+        (ranked) => ranked.length > 0 && (!empty || ranked.some((r) => r.worst !== undefined)),
+        (ranked) => setAnswer({ asked, ranked }),
+      );
     }, 250);
     return () => {
-      current = false;
+      stop();
       clearTimeout(timer);
     };
   }, [asked]);
@@ -55,7 +57,7 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">{t.helpTeammate}</p>
-      <div className="flex gap-1">
+      <div className="grid grid-cols-4 gap-1 sm:flex">
         {open.map((key) => (
           <button
             key={key}
@@ -65,8 +67,8 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
             // Tapped again it closes, so the page can go back to being short.
             onClick={() => setChosen(lane === key ? null : key)}
             className={cn(
-              'min-h-9 flex-1 rounded-md px-1 font-display text-xs uppercase tracking-wide sm:flex-none sm:px-3',
-              lane === key ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground',
+              'min-h-9 rounded-md px-1 font-display text-xs uppercase tracking-wide sm:flex-none sm:px-3',
+              lane === key ? chipOn : chipOff,
             )}
           >
             {key}
@@ -77,7 +79,11 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
         <div className="pt-2">
           <PickSuggestions
             ranked={ranked}
-            heading={t.teammateBest(lane.toUpperCase())}
+            heading={
+              ranked.some((r) => r.worst !== undefined)
+                ? t.safeFirstFor(lane.toUpperCase())
+                : t.teammateBest(lane.toUpperCase())
+            }
             portraits={portraits}
             onPick={(hero) => onAdd(hero, lane)}
           />

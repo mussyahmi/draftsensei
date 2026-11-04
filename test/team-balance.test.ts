@@ -1,7 +1,7 @@
 import { test, expect } from 'vitest';
 import { HEROES } from '../lib/heroes';
 import { HERO_PROFILES } from '../lib/hero-profiles';
-import { enemyDamage, fillsGaps, teamGaps, tellingFills } from '../lib/team-balance';
+import { enemyDamage, fillsGaps, offLane, teamGaps, tellingFills } from '../lib/team-balance';
 import { matchupLines, rankPicks, type Gains } from '../lib/matchups';
 
 test('every hero has a role and a damage type', () => {
@@ -75,4 +75,17 @@ test('mixed damage heroes favour neither side', () => {
 
 test('a hero with no profile is left out of the count', () => {
   expect(enemyDamage(['Layla', 'Hayabusa', 'Brand New'])).toBeNull();
+});
+
+test('a hero out of every lane the game lists is flagged, with where it usually plays', () => {
+  expect(offLane([{ hero: 'Kalea', lane: 'exp' }])).toEqual([{ hero: 'Kalea', lane: 'exp', usual: 'roam' }]);
+});
+
+test('a hero in its usual lane or another listed lane is fine', () => {
+  expect(offLane([{ hero: 'Kalea', lane: 'roam' }])).toEqual([]);
+  expect(offLane([{ hero: 'Selena', lane: 'mid' }, { hero: 'Selena', lane: 'roam' }])).toEqual([]);
+});
+
+test('a hero with no known lane raises no alarm', () => {
+  expect(offLane([{ hero: 'Brand New', lane: 'mid' }])).toEqual([]);
 });

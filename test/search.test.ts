@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { searchHeroes } from '../lib/draft';
+import { heroListPlace, searchHeroes } from '../lib/draft';
 import { HEROES as ROSTER } from '../lib/heroes';
 
 const HEROES = ['Rafaela', 'Ruby', 'Eudora', 'Yi Sun-shin', 'X.Borg', 'Popol and Kupa'];
@@ -75,4 +75,22 @@ test('typing any hero in full finds that hero first', () => {
 
 test('between equally close typos, the name starting the same way comes first', () => {
   expect(searchHeroes('nann', ROSTER)[0]).toBe('Nana');
+});
+
+test('a list that fits below stays below, even with more room above', () => {
+  expect(heroListPlace(1, 100, 300)).toEqual({ up: false, maxHeight: 44 });
+});
+
+test('a list that does not fit below opens on the roomier side', () => {
+  expect(heroListPlace(6, 100, 500).up).toBe(true);
+  expect(heroListPlace(6, 120, 80).up).toBe(false);
+});
+
+test('with no room for the whole list, it is cut to fit and scrolls rather than leave the screen', () => {
+  expect(heroListPlace(6, 100, 90)).toEqual({ up: false, maxHeight: 92 });
+  expect(heroListPlace(6, 60, 120)).toEqual({ up: true, maxHeight: 112 });
+});
+
+test('a list always keeps at least one row', () => {
+  expect(heroListPlace(3, 10, 5).maxHeight).toBe(44);
 });

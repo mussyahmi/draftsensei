@@ -49,13 +49,34 @@ export function heroOf(line: string, heroes: string[]): string | null {
 export type Block = { line: number } | { items: string[] };
 
 export function buildBlocks(text: string): Block[] {
+  const lines = text.split('\n');
+  const itemAt = lines.map((line) => (itemLine(line) ? itemOf(line) : null));
+  const names = itemAt.flatMap((n) => n ?? []).map((n) => n.toLowerCase());
+  // Gemini may write an item's reason right under it, between items. The items
+  // read best as one row, so reasons wait until the row is finished.
+  const isReason = (line: string) =>
+    names.some((n) => line.toLowerCase().replace(/\*\*/g, '').trim().startsWith(`${n}:`));
+
   const blocks: Block[] = [];
-  text.split('\n').forEach((line, i) => {
-    const item = itemLine(line) && itemOf(line);
-    if (!item) return void blocks.push({ line: i });
-    const last = blocks.at(-1);
-    if (last && 'items' in last) last.items.push(item);
-    else blocks.push({ items: [item] });
+  const reasons: Block[] = [];
+  let lastItem = -1;
+  itemAt.forEach((item, i) => {
+    if (item) lastItem = i;
+  });
+  lines.forEach((line, i) => {
+    const item = itemAt[i];
+    if (item) {
+      const last = blocks.at(-1);
+      if (last && 'items' in last) last.items.push(item);
+      else blocks.push({ items: [item] });
+    } else if (isReason(line) && i < lastItem) {
+      reasons.push({ line: i });
+    } else if (i < lastItem && !line.trim() && blocks.at(-1) && 'items' in blocks.at(-1)!) {
+      // A blank line between items does not end the row.
+    } else {
+      blocks.push({ line: i });
+    }
+    if (i === lastItem) blocks.push(...reasons.splice(0));
   });
   return blocks;
 }

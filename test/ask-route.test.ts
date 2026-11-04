@@ -168,6 +168,7 @@ test('a build ask has Gemini adjust the build the player already sees', async ()
     'flicker, support emblem (inspire)',
     'items: flask of the oasis, glowing wand',
     'adjust it for this enemy team: keep its battle spell, emblem and talents, keep every item that still fits, and swap only the items this enemy team calls for',
+    'once all 6 items are listed, for each item you swapped in, add one line with no number or bullet, as item name: the enemy it is for, 6 words max; no such line for an item you kept',
   ].join('\n'));
 });
 
@@ -317,4 +318,16 @@ test('a plain ask never searches', async () => {
 
 test('the timeout leaves room for a search and a plain ask inside a 60s proxy', () => {
   expect(SEARCH_TIMEOUT_MS + MODEL_TIMEOUT_MS).toBeLessThan(60_000);
+});
+
+test('with nothing on the board, Gemini gets no matchup numbers', async () => {
+  let sent = '';
+  vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+    const body = stats(url);
+    if (body) return new Response(JSON.stringify(body));
+    sent = promptOf(init);
+    return answer('Diggie');
+  });
+  await ask('suggest roam hero', false, { lane: 'roam', enemy: [], team: [], pool: [] });
+  expect(sent).toBe('suggest roam hero');
 });

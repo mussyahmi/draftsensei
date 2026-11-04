@@ -7,6 +7,8 @@ export type MetaHero = {
   hero: string;
   win: number;
   ban: number;
+  // How often it is picked, for the heroes page.
+  pick?: number;
   // The hero of mine it beats the hardest, when it beats one.
   threat?: { hero: string; gain: number };
 };
@@ -16,6 +18,7 @@ type RankRecord = {
     main_hero: { data: { name: string } };
     main_hero_win_rate: number;
     main_hero_ban_rate: number;
+    main_hero_appearance_rate?: number;
   };
 };
 export type RankPage = { data?: { records?: RankRecord[] } };
@@ -33,6 +36,7 @@ export function metaFrom(page: RankPage): MetaHero[] {
       hero: data.main_hero?.data?.name?.trim() ?? '',
       win: data.main_hero_win_rate,
       ban: data.main_hero_ban_rate,
+      ...(Number.isFinite(data.main_hero_appearance_rate) && { pick: data.main_hero_appearance_rate }),
     }))
     .filter((m) => m.hero && Number.isFinite(m.win) && Number.isFinite(m.ban))
     .sort((a, b) => score(b) - score(a));

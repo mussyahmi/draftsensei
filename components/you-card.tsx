@@ -19,12 +19,12 @@ export function YouCard({ lane, rank, onLane, onRank }: Props) {
   return (
     <div className="grid gap-4 sm:grid-cols-[auto_auto] sm:justify-start sm:gap-8">
       <div className="space-y-2">
-        <h3 className="font-display text-sm uppercase tracking-widest text-primary">{t.playing}</h3>
+        <h3 className="font-display text-sm uppercase tracking-widest text-muted-foreground">{t.playing}</h3>
         <LanePicker value={lane} onChange={onLane} className="w-full sm:w-auto" />
       </div>
       {/* Stats from players at your level fit you better than all ranks mixed. */}
       <label className="block space-y-2">
-        <span className="block font-display text-sm uppercase tracking-widest text-primary">{t.myRank}</span>
+        <span className="block font-display text-sm uppercase tracking-widest text-muted-foreground">{t.myRank}</span>
         {/* The browser's own arrow sits hard against the edge and matches
             nothing else here, so it is swapped for the app's chevron. */}
         <span className="relative block sm:inline-block">

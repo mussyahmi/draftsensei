@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react';
 import { LANGS, STRINGS, type Lang, type Strings } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { chipOn, cn } from '@/lib/utils';
 
 const LangContext = createContext<Strings>(STRINGS.en);
 
@@ -28,8 +28,8 @@ export function LangToggle({ value, onChange }: { value: Lang; onChange: (lang: 
           title={l.name}
           onClick={() => onChange(l.key)}
           className={cn(
-            'h-7 min-w-9 rounded px-2 font-display text-xs tracking-wide',
-            value === l.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+            'h-8 min-w-9 rounded px-2 font-display text-xs tracking-wide sm:h-7',
+            value === l.key ? chipOn : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {l.label}

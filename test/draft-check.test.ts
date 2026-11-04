@@ -38,15 +38,35 @@ test('team strength averages only the win rates it has', () => {
 });
 
 test('counters add up, and name the biggest for and against', () => {
-  const c = draftCheck(base).counters!;
-  expect(c.total).toBeCloseTo(-0.002);
-  expect(c.best).toEqual({ hero: 'Khufra', enemy: 'Selena', gain: 0.016 });
-  expect(c.worst).toEqual({ hero: 'Moskov', enemy: 'Rafaela', gain: -0.03 });
+  const c = draftCheck({ ...base, me: null, opponent: null, against: new Map([
+    ['Rafaela', new Map([['Moskov', -0.001], ['Chou', 0.03]])],
+    ['Selena', new Map([['Moskov', 0.001]])],
+  ]) }).counters!;
+  expect(c.total).toBeCloseTo(0.03);
+  expect(c.best).toEqual({ hero: 'Chou', enemy: 'Rafaela', gain: 0.03 });
+  expect(c.worst).toEqual({ hero: 'Moskov', enemy: 'Rafaela', gain: -0.001 });
+});
+
+test('a pair is only said once: threat, then lane, then my matchups, then counters', () => {
+  const against = new Map([
+    ['Rafaela', new Map([['Khufra', 0.01], ['Chou', 0.04]])],
+    ['Selena', new Map([['Khufra', -0.03], ['Moskov', -0.005]])],
+    ['Bruno', new Map([['Khufra', -0.01], ['Moskov', -0.004]])],
+    ['Nolan', new Map([['Khufra', 0.02]])],
+  ]);
+  const check = draftCheck({ ...base, against });
+  expect(check.threats[0]).toEqual({ enemy: 'Selena', hero: 'Khufra', gain: -0.03 });
+  expect(check.lane).toEqual({ me: 'Khufra', enemy: 'Rafaela', gain: 0.01 });
+  expect(check.threats[1]).toEqual({ enemy: 'Bruno', hero: 'Khufra', gain: -0.01 });
+  // Both of my losing matchups are named as threats already.
+  expect(check.matchups).toEqual({ best: { enemy: 'Nolan', gain: 0.02 }, worst: null });
+  expect(check.counters!.best).toEqual({ hero: 'Chou', enemy: 'Rafaela', gain: 0.04 });
+  expect(check.counters!.worst).toEqual({ hero: 'Moskov', enemy: 'Selena', gain: -0.005 });
 });
 
 test('with no winning matchup there is no best, and no data means no counters', () => {
   const losing = new Map([['Rafaela', new Map([['Khufra', -0.01]])]]);
-  expect(draftCheck({ ...base, against: losing }).counters!.best).toBeNull();
+  expect(draftCheck({ ...base, me: null, opponent: null, against: losing }).counters!.best).toBeNull();
   expect(draftCheck({ ...base, against: new Map() }).counters).toBeNull();
 });
 
@@ -130,10 +150,10 @@ test('all winning or all losing, my matchups show only that side', () => {
     best: { enemy: 'Rafaela', gain: 0.02 },
     worst: null,
   });
-  const losing = new Map([['Rafaela', new Map([['Khufra', -0.02]])], ['Selena', new Map([['Khufra', -0.01]])]]);
+  const losing = new Map([['Rafaela', new Map([['Khufra', -0.004]])], ['Selena', new Map([['Khufra', -0.002]])]]);
   expect(draftCheck({ ...base, opponent: null, against: losing }).matchups).toEqual({
     best: null,
-    worst: { enemy: 'Rafaela', gain: -0.02 },
+    worst: { enemy: 'Rafaela', gain: -0.004 },
   });
 });
 
@@ -158,4 +178,10 @@ test('the enemy in my lane has its own line, so my matchups leave it out', () =>
   });
   const onlyLane = new Map([['Rafaela', new Map([['Khufra', -0.02]])]]);
   expect(draftCheck({ ...base, against: onlyLane }).matchups).toBeNull();
+});
+
+test('the strongest enemy is the one winning most at my rank, whatever it faces', () => {
+  const wins = new Map([['Rafaela', 0.5], ['Bruno', 0.56], ['Khufra', 0.7]]);
+  expect(draftCheck({ ...base, wins }).strongest).toEqual({ enemy: 'Bruno', win: 0.56 });
+  expect(draftCheck({ ...base, wins: new Map() }).strongest).toBeNull();
 });

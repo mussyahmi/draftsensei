@@ -1,8 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { TriangleAlert } from 'lucide-react';
 import {
+  isEmptyDraft,
+  moveToLane,
   buildPrompt,
   newDraft,
   newPool,
@@ -33,6 +36,7 @@ import {
   type Account,
 } from '@/lib/cloud';
 import { firebaseReady } from '@/lib/firebase';
+import { retryUntil } from '@/lib/retry';
 import { newer } from '@/lib/sync';
 import { AccountButton } from '@/components/account-button';
 import { AskPanel, type Answer } from '@/components/ask-panel';
@@ -43,19 +47,21 @@ import { PickList } from '@/components/pick-list';
 import { DraftCheckCard } from '@/components/draft-check-card';
 import { PoolDialog } from '@/components/pool-dialog';
 import { TeammatePicks } from '@/components/teammate-picks';
+import { ThreatLine } from '@/components/threat-line';
 import { WinRate } from '@/components/win-rate';
 import { BanList } from '@/components/ban-list';
 import { winsBy, type MetaHero } from '@/lib/bans';
-import { enemyDamage, teamGaps } from '@/lib/team-balance';
+import { enemyDamage, offLane, teamGaps } from '@/lib/team-balance';
 import { PickSuggestions } from '@/components/pick-suggestions';
 import { HowTo } from '@/components/how-to';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import type { Ranked } from '@/lib/matchups';
 import { ChangelogDialog } from '@/components/changelog-dialog';
 import type { Release } from '@/lib/changelog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LangProvider, LangToggle } from '@/components/lang';
+import { LangProvider } from '@/components/lang';
+import { SiteHeader } from '@/components/site-header';
 import { STRINGS, langFor, type Strings } from '@/lib/i18n';
 
 // The page asks twice: which hero to pick, then how to build them.
@@ -78,7 +84,7 @@ const forPhase =
 
 function PhaseTitle({ n, children, aside }: { n: number; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
-    <h2 className="font-display text-lg uppercase tracking-wide">
+    <h2 className="mb-4! font-display text-lg uppercase tracking-wide">
       <span className="text-primary">{n}</span> {children}
       {aside && <span className="ms-2 font-sans text-sm normal-case tracking-normal text-muted-foreground">{aside}</span>}
     </h2>
@@ -86,6 +92,7 @@ function PhaseTitle({ n, children, aside }: { n: number; children: React.ReactNo
 }
 
 const SIDES: Side[] = ['team', 'enemy'];
+const UNDO_MS = 8000;
 
 // A message to show in whichever language is on when it is shown, so a
 // switch of language mid-error does not leave the old one on screen.
@@ -165,20 +172,15 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   const mine = poolFor(pool, draft.myLane).join('|');
   useEffect(() => {
     if (!hydrated) return;
-    let current = true;
     const query = new URLSearchParams({ rank: draft.rank });
     for (const hero of mine ? mine.split('|') : []) query.append('mine', hero);
-    fetch(`/api/bans?${query}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((m: MetaHero[]) => {
-        if (current) setMeta(m);
-      })
-      .catch(() => {
-        /* no ban suggestions; banning by name still works */
-      });
-    return () => {
-      current = false;
-    };
+    // Comes back empty while the data source is rate-limiting.
+    return retryUntil<MetaHero[]>(
+      () => fetch(`/api/bans?${query}`).then((r) => (r.ok ? r.json() : [])),
+      [],
+      (m) => m.length > 0,
+      setMeta,
+    );
   }, [hydrated, draft.rank, mine]);
 
   // What was last written, and when. Refs, because these are bookkeeping for
@@ -233,24 +235,24 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   // dropped.
   useEffect(() => {
     if (!hydrated) return;
-    if (!picks.enemy.length && !picks.team.length) return;
-    let current = true;
+    const empty = !picks.enemy.length && !picks.team.length;
+    let stop = () => {};
     const timer = setTimeout(() => {
-      fetch('/api/picks', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ picks }),
-      })
-        .then((r) => (r.ok ? r.json() : []))
-        .then((ranked: Ranked[]) => {
-          if (current) setInstant(ranked);
-        })
-        .catch(() => {
-          /* no instant picks; Suggest heroes still works */
-        });
+      stop = retryUntil<Ranked[]>(
+        () =>
+          fetch('/api/picks', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ picks }),
+          }).then((r) => (r.ok ? r.json() : [])),
+        [],
+        // On an empty board, win rates alone are not yet the safe picks.
+        (ranked) => ranked.length > 0 && (!empty || ranked.some((r) => r.worst !== undefined)),
+        setInstant,
+      );
     }, 250);
     return () => {
-      current = false;
+      stop();
       clearTimeout(timer);
     };
   }, [hydrated, picks]);
@@ -455,7 +457,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       ...d,
       picks: {
         ...d.picks,
-        [side]: d.picks[side].map((p, i) => (i === index ? { ...p, lane } : p)),
+        [side]: moveToLane(d.picks[side], index, lane),
       },
     }));
   };
@@ -467,7 +469,18 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     }));
   };
 
+  // A slip of the thumb on New draft should not cost the whole board.
+  const [undo, setUndo] = useState<{ draft: Draft; answers: Record<Phase, Answer | null> } | null>(null);
+  useEffect(() => {
+    if (!undo) return;
+    const timer = setTimeout(() => setUndo(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [undo]);
+
   const resetDraft = () => {
+    // An empty board has nothing to bring back, and must not replace a draft
+    // the last press could still restore.
+    if (!isEmptyDraft(draft)) setUndo({ draft, answers });
     // Lane, rank and language are about the player, not the draft, so they stay.
     setDraft((d) => ({ ...newDraft(), myLane: d.myLane, rank: d.rank, lang: d.lang }));
     setAnswers({ pick: null, build: null });
@@ -482,6 +495,11 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   };
 
   const gaps = teamGaps([...new Set([...draft.picks.team.map((p) => p.hero), ...(draft.myHero ? [draft.myHero] : [])])]);
+  // My own row goes by my lane, whatever lane I typed myself in under.
+  const offLanes = offLane([
+    ...draft.picks.team.filter((p) => p.hero !== draft.myHero),
+    ...(draft.myHero ? [{ hero: draft.myHero, lane: draft.myLane }] : []),
+  ]);
   const enemyHits = enemyDamage(draft.picks.enemy.map((p) => p.hero));
 
   const t = STRINGS[draft.lang];
@@ -497,59 +515,65 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
   return (
     <LangProvider lang={draft.lang}>
-      <header className="border-b border-border bg-card/60">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="flex w-full items-center gap-3 sm:w-auto">
-            <div className="flex items-baseline gap-1.5">
-              <h1 className="font-display text-xl uppercase tracking-wider">DraftSensei</h1>
-              <button
-                type="button"
-                onClick={() => setChangelogOpen(true)}
-                title={t.whatsNew}
-                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                v{process.env.NEXT_PUBLIC_APP_VERSION}
-              </button>
-            </div>
-            <div className="ms-auto sm:ms-0">
-              <LangToggle value={draft.lang} onChange={(lang) => setDraft((d) => ({ ...d, lang }))} />
-            </div>
-          </div>
+      <SiteHeader
+        lang={draft.lang}
+        onLang={(lang) => setDraft((d) => ({ ...d, lang }))}
+        onVersion={() => setChangelogOpen(true)}
+        note={
           <span className="text-xs text-muted-foreground">
             {/* Only worth a glance once the shared allowance runs low. */}
             {used !== null && used >= DAILY_LIMIT * 0.8 && t.asksToday(used, DAILY_LIMIT)}
           </span>
-          <div className="ms-auto flex items-center gap-1">
-            {firebaseReady && (
-              <AccountButton
-                account={account}
-                busy={syncing}
-                problem={syncProblem?.(t) ?? null}
-                onSignIn={signIn}
-                onSignOut={signOutNow}
-              />
-            )}
-            <Button variant="ghost" size="sm" onClick={() => setPoolOpen(true)}>
-              {t.myHeroes}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={resetDraft}>
-              {t.newDraft}
-            </Button>
-          </div>
-        </div>
-      </header>
+        }
+      >
+        {firebaseReady && (
+          <AccountButton
+            account={account}
+            busy={syncing}
+            problem={syncProblem?.(t) ?? null}
+            onSignIn={signIn}
+            onSignOut={signOutNow}
+          />
+        )}
+        <Link href="/heroes" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'h-9 sm:h-7')}>
+          {t.heroesLink}
+        </Link>
+        <Button variant="ghost" size="sm" className="h-9 sm:h-7" onClick={() => setPoolOpen(true)}>
+          {t.myHeroes}
+        </Button>
+        {/* It wipes the board, so it stands apart from the others. */}
+        <span className="ms-1 border-s border-border ps-1">
+          <Button variant="ghost" size="sm" className="h-9 sm:h-7" onClick={resetDraft}>
+            {t.newDraft}
+          </Button>
+        </span>
+      </SiteHeader>
 
       <main className="mx-auto w-full max-w-5xl flex-1 space-y-8 px-4 py-4">
+        {undo && (
+          <p role="status" className="flex items-center justify-between gap-2 rounded-md bg-card px-3 py-1 text-sm">
+            {t.draftCleared}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-primary sm:h-7"
+              onClick={() => {
+                setDraft(undo.draft);
+                setAnswers(undo.answers);
+                setUndo(null);
+              }}
+            >
+              {t.undo}
+            </Button>
+          </p>
+        )}
         {/* Groups sit further apart than the parts inside them, so it reads
             which heading and box belong together. */}
         {/* Who is playing: set once, so it sits above the numbered steps of
             the draft rather than being one of them. */}
         <section className="space-y-6">
           {hydrated &&
-            !draft.myHero &&
-            !draft.bans.length &&
-            !draft.picks.team.length &&
-            !draft.picks.enemy.length && <HowTo />}
+            isEmptyDraft(draft) && <HowTo />}
           {/* On a phone the lane is the control touched most, so it spans the
               width with thumb-sized chips. */}
           <YouCard
@@ -562,7 +586,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
         {/* The steps follow the game's own draft: bans, then picks, then the
             build once the hero is locked in. */}
-        <section className="space-y-4 border-t border-border pt-8">
+        <section className="space-y-6 border-t border-border pt-8">
           <PhaseTitle n={1} aside={`${draft.bans.length} / 10 · ${t.optional}`}>
             {t.bans}
           </PhaseTitle>
@@ -582,8 +606,8 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             {/* A full team has no pick left to suggest. */}
             {!draft.myHero && counts.team < 5 && (
               <PickSuggestions
-                // An emptied board keeps no stale picks from before.
-                ranked={picks.enemy.length || picks.team.length ? instant : []}
+                ranked={instant}
+                heading={!picks.enemy.length && !picks.team.length && instant.some((r) => r.worst !== undefined) ? t.safeFirst : undefined}
                 ai={aiPicks}
                 portraits={portraits}
                 onPick={pickFromChips}
@@ -593,7 +617,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
           {/* Open lanes keep going after my own pick: that is often when
               teammates are still deciding. */}
-          {(picks.enemy.length > 0 || picks.team.length > 0) && counts.team < 5 && (
+          {counts.team < 5 && (
             <TeammatePicks
               board={{
                 ...picks,
@@ -644,6 +668,21 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
                   }
                   onClearMe={() => setDraft((d) => ({ ...d, myHero: newDraft().myHero }))}
                 />
+                {/* Once the draft is full, Draft check says this instead. */}
+                {side === 'enemy' && counts.enemy >= 1 && counts.team >= 2 && (counts.team < 5 || counts.enemy < 5) && (
+                  <ThreatLine
+                    team={[...new Set([...draft.picks.team.map((p) => p.hero), ...(draft.myHero ? [draft.myHero] : [])])]}
+                    enemy={draft.picks.enemy.map((p) => p.hero)}
+                    rank={draft.rank}
+                  />
+                )}
+                {side === 'team' &&
+                  offLanes.map((o) => (
+                    <p key={o.hero} className="flex items-center gap-1.5 text-sm text-primary">
+                      <TriangleAlert className="size-4 shrink-0" />
+                      {t.offLane(o.hero, o.usual.toUpperCase(), o.lane.toUpperCase())}
+                    </p>
+                  ))}
                 {side === 'team' && gaps.length > 0 && (
                   <p className="flex items-center gap-1.5 text-sm text-primary">
                     <TriangleAlert className="size-4 shrink-0" />
@@ -685,7 +724,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         <section ref={buildSectionRef} className="scroll-mt-4 space-y-6 border-t border-border pt-8">
           <PhaseTitle n={3}>{t.myBuild}</PhaseTitle>
           <div className="max-w-sm space-y-2">
-            <h3 className="font-display text-sm uppercase tracking-widest text-primary">
+            <h3 className="font-display text-sm uppercase tracking-widest text-muted-foreground">
               {t.heroIPicked}
             </h3>
             <HeroEntry

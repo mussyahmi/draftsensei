@@ -6,6 +6,30 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.9.0] - 2026-11-04
+
+### Added
+- Safe first picks: before anyone has picked, suggestions favour strong heroes without a hard counter and name their worst matchup, for your lane and your teammates' lanes.
+- Bahasa Indonesia: the page and the AI's answers, with a phone set to Indonesian starting in it.
+- Draft check names the strongest enemy, the one winning most at your rank.
+- Biggest threats: names up to two enemies hardest on your team, and which of your heroes each hurts most, during picks and in Draft check.
+- My team warns when a hero is in a lane it does not usually play.
+- When the AI adjusts a build, each swapped item says which enemy it is for.
+- Heroes page: every hero's win, ban and pick rate at your rank, by lane, with who it beats, who beats it, best teammates and top build. Add a hero to My heroes from there.
+
+### Changed
+- The how-to steps can be hidden for good, and the ? in the header opens them on any page, mid-draft too.
+- The lane menu shows who is in each lane, and choosing a taken lane swaps the two heroes.
+- Calmer page: solid gold is kept for the main action, lane buttons stay quiet until a lane looks wrong, enemy names are easier to read, and buttons are easier to tap on a phone.
+- New draft can be undone for a few seconds.
+- Draft check is grouped into Watch out, You and Team, with no pair repeated. Laptops see the groups side by side; phones tuck Team behind a tap.
+- Hero suggestions show before anyone has picked, ranked by win rate at your rank, for whoever picks first.
+
+### Fixed
+- Suggestions come back by themselves after the match data has been unavailable for a while.
+- On a phone, the hero list opens above the box when the keyboard would cover it.
+- On a phone, the keyboard closes after you choose a hero.
+
 ## [0.8.0] - 2026-11-03
 
 ### Added

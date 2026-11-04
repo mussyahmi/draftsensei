@@ -3,6 +3,7 @@
 
 import { damageSplit, type DamageSplit } from './team-balance';
 import type { Gains } from './matchups';
+import { biggestThreats, type Threat } from './threat';
 
 export type DraftCheck = {
   // The hero on my team in my lane against the enemy there.
@@ -14,6 +15,10 @@ export type DraftCheck = {
     best: { hero: string; enemy: string; gain: number } | null;
     worst: { hero: string; enemy: string; gain: number } | null;
   } | null;
+  // The enemies hardest on my team overall.
+  threats: Threat[];
+  // The enemy winning most at my rank, whatever it faces in this draft.
+  strongest: { enemy: string; win: number } | null;
   // Who I do best and worst against, so I know who to chase and who to avoid.
   matchups: {
     best: { enemy: string; gain: number } | null;
@@ -45,6 +50,13 @@ export function draftCheck(input: {
 
   const laneGain = me && opponent ? against.get(opponent)?.get(me) : undefined;
 
+  const strongest = enemy
+    .flatMap((e) => {
+      const win = wins.get(e);
+      return win === undefined ? [] : [{ enemy: e, win }];
+    })
+    .sort((a, b) => b.win - a.win)[0];
+
   const [teamWin, enemyWin] = [average(team, wins), average(enemy, wins)];
 
   const pairs = enemy.flatMap((e) =>
@@ -56,9 +68,18 @@ export function draftCheck(input: {
   const ranked = [...pairs].sort((a, b) => b.gain - a.gain);
 
   // The enemy in my lane already has its own line.
-  const mine = ranked.filter((p) => p.hero === me && p.enemy !== opponent);
+  // Each pair is said once: the card reads top to bottom, so a line skips what
+  // the lines before it already showed.
+  const threats = biggestThreats(team, enemy, against);
+  const pairKey = (hero: string, e: string) => `${hero}|${e}`;
+  const said = new Set(threats.map((t) => pairKey(t.hero, t.enemy)));
+  if (me && opponent) said.add(pairKey(me, opponent));
+  const mine = ranked.filter((p) => p.hero === me && !said.has(pairKey(p.hero, p.enemy)));
   const myBest = mine[0];
   const myWorst = mine.at(-1);
+  if (myBest && myBest.gain > 0) said.add(pairKey(myBest.hero, myBest.enemy));
+  if (myWorst && myWorst.gain < 0) said.add(pairKey(myWorst.hero, myWorst.enemy));
+  const fresh = ranked.filter((p) => !said.has(pairKey(p.hero, p.enemy)));
 
   const combos = team.flatMap((a) =>
     team.flatMap((b) => {
@@ -76,10 +97,12 @@ export function draftCheck(input: {
     counters: pairs.length
       ? {
           total: pairs.reduce((sum, p) => sum + p.gain, 0),
-          best: ranked[0].gain > 0 ? ranked[0] : null,
-          worst: ranked.at(-1)!.gain < 0 ? ranked.at(-1)! : null,
+          best: fresh[0]?.gain > 0 ? fresh[0] : null,
+          worst: fresh.at(-1) && fresh.at(-1)!.gain < 0 ? fresh.at(-1)! : null,
         }
       : null,
+    threats,
+    strongest: strongest ?? null,
     matchups:
       myBest && (myBest.gain > 0 || myWorst!.gain < 0)
         ? {

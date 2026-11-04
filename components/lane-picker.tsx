@@ -30,7 +30,7 @@ export function LanePicker({ value, onChange, className }: Props) {
           aria-label={laneLabel(lane.key)}
           title={laneLabel(lane.key)}
           className={cn(
-            'h-10 flex-1 px-2.5 font-display text-xs uppercase tracking-wide aria-pressed:bg-primary aria-pressed:text-primary-foreground sm:h-8 sm:flex-none',
+            'h-10 flex-1 px-2.5 font-display text-xs uppercase tracking-wide aria-pressed:bg-primary/15 aria-pressed:text-primary aria-pressed:ring-1 aria-pressed:ring-inset aria-pressed:ring-primary/50 sm:h-8 sm:flex-none',
           )}
         >
           {lane.key}

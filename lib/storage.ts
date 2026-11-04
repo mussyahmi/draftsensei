@@ -2,6 +2,7 @@ import { newDraft, newPool, type Draft, type Pool } from './draft';
 
 const DRAFT_KEY = 'ml-draft-helper';
 const POOL_KEY = 'ml-draft-helper-pool';
+const HOW_TO_KEY = 'ml-draft-helper-how-to-hidden';
 
 // Private browsing throws on both read and write. The app still works there; it
 // just forgets everything on reload.
@@ -38,3 +39,7 @@ export const saveDraft = (saved: Saved) => write(DRAFT_KEY, saved);
 export const loadPool = (): Pool => ({ ...newPool(), ...(read<Pool>(POOL_KEY) ?? {}) });
 
 export const savePool = (pool: Pool) => write(POOL_KEY, pool);
+
+export const loadHowToHidden = (): boolean => read<boolean>(HOW_TO_KEY) === true;
+
+export const saveHowToHidden = (hidden: boolean) => write(HOW_TO_KEY, hidden);

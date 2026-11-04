@@ -100,3 +100,33 @@ test('an emblem written with the word emblem still gives its name', () => {
   expect(itemOf('Emblem: Tank Emblem (Agility, Wilderness Blessing, Concussive Blast)')).toBe('Tank');
   expect(itemOf('- **Emblem:** Support Emblem')).toBe('Support');
 });
+
+test('reasons written between items wait until the row of items is finished', () => {
+  const text = [
+    'Battle spell: Flicker',
+    '1. Thunder Belt',
+    '2. Antique Cuirass',
+    "Antique Cuirass: for Lancelot's burst",
+    "3. Athena's Shield",
+    "Athena's Shield: for Luo Yi",
+    '4. Immortality',
+    'Help first: Aulus',
+  ].join('\n');
+  expect(buildBlocks(text)).toEqual([
+    { line: 0 },
+    { items: ['Thunder Belt', 'Antique Cuirass', "Athena's Shield", 'Immortality'] },
+    { line: 3 },
+    { line: 5 },
+    { line: 7 },
+  ]);
+});
+
+test('reasons after the items stay after them, ahead of the tips', () => {
+  const text = ['1. Thunder Belt', '2. Antique Cuirass', 'Antique Cuirass: for Lancelot', 'Help first: Aulus'].join('\n');
+  expect(buildBlocks(text)).toEqual([{ items: ['Thunder Belt', 'Antique Cuirass'] }, { line: 2 }, { line: 3 }]);
+});
+
+test('a line that merely mentions an item is not taken for its reason', () => {
+  const text = ['1. Thunder Belt', 'Win condition: rush Thunder Belt early', '2. Immortality'].join('\n');
+  expect(buildBlocks(text)).toEqual([{ items: ['Thunder Belt'] }, { line: 1 }, { items: ['Immortality'] }]);
+});

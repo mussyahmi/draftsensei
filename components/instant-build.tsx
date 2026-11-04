@@ -2,6 +2,7 @@
 
 import { GameImage } from '@/components/game-image';
 import { useT } from '@/components/lang';
+import { cn } from '@/lib/utils';
 import type { Build } from '@/lib/builds';
 
 export type TopBuild = { build: Build; icons: Record<string, string | null> };
@@ -25,11 +26,11 @@ function Piece({ name, icon, note }: { name: string; icon: string | null | undef
 // The build that wins most for my hero in my lane, straight from ranked
 // games, shown as soon as the hero is known. Gemini's answer below fills in
 // the rest of the items for this enemy team.
-export function InstantBuild({ top }: { top: TopBuild }) {
+export function InstantBuild({ top, wide }: { top: TopBuild; wide?: boolean }) {
   const t = useT();
   const { build, icons } = top;
   return (
-    <div className="max-w-lg space-y-2 rounded-md bg-card/80 p-3">
+    <div className={cn('space-y-2 rounded-md bg-card/80 p-3', !wide && 'max-w-lg')}>
       <p className="text-xs text-muted-foreground">{t.topBuild(Math.round(build.winRate * 100))}</p>
       <ul className="flex flex-wrap gap-x-6 gap-y-2">
         {build.spell && <Piece name={build.spell} icon={icons[build.spell]} />}

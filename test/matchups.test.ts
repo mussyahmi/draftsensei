@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { candidatesFor, pickReason, rankPicks, matchupLines, type Gains } from '../lib/matchups';
+import { candidatesFor, pickReason, rankPicks, matchupLines, safeRanked, type Gains } from '../lib/matchups';
 
 // How much each hero's win rate moves against or alongside one picked hero.
 const vsSun: Gains = new Map([['Jawhead', 0.039], ['Saber', 0.031], ['Natan', -0.052]]);
@@ -109,6 +109,42 @@ test('a chip leads with the win rate, so every hero has a number and the order e
   const base = { hero: 'Marcel', against: 0, alongside: 0, best: null, win: 0.575 };
   expect(pickReason(base)).toBe('57.5% win');
   expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 } })).toBe('57.5% win, +0.2% vs Masha');
-  expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 }, partner: { ally: 'Kaja', gain: 0.036 } }, { win: 'menang', with: 'bersama' }))
+  expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 }, partner: { ally: 'Kaja', gain: 0.036 } }, { win: 'menang', with: 'bersama', worst: 'terburuk vs' }))
     .toBe('57.5% menang, +0.2% vs Masha, +3.6% bersama Kaja');
+});
+
+const firstWins = new Map([['Marcel', 0.575], ['Diggie', 0.55], ['Gloo', 0.54]]);
+
+test('a strong hero with a hard counter ranks below one that is safer', () => {
+  const counters = new Map<string, Gains>([
+    ['Marcel', new Map([['Angela', 0.047], ['Floryn', 0.01]])],
+    ['Diggie', new Map([['Nana', 0.005]])],
+    ['Gloo', new Map([['Estes', 0.03]])],
+  ]);
+  const ranked = safeRanked(['Marcel', 'Diggie', 'Gloo'], firstWins, counters);
+  expect(ranked.map((r) => r.hero)).toEqual(['Diggie', 'Marcel', 'Gloo']);
+  expect(ranked[1].worst).toEqual({ enemy: 'Angela', gain: -0.047 });
+});
+
+test('a banned hero is no threat to a first pick', () => {
+  const counters = new Map<string, Gains>([['Marcel', new Map([['Angela', 0.047], ['Floryn', 0.01]])]]);
+  expect(safeRanked(['Marcel'], firstWins, counters, new Set(['Angela']))[0].worst).toEqual({ enemy: 'Floryn', gain: -0.01 });
+});
+
+test('nothing beating a hero means no worst matchup, and it never counts itself', () => {
+  const counters = new Map<string, Gains>([['Diggie', new Map([['Diggie', 0.5], ['Nana', -0.02]])]]);
+  expect(safeRanked(['Diggie'], firstWins, counters)[0].worst).toBeNull();
+});
+
+test('a hero whose counters did not load goes after those that did, and a hero with no win rate is left out', () => {
+  const counters = new Map<string, Gains>([['Gloo', new Map([['Estes', 0.03]])]]);
+  const ranked = safeRanked(['Marcel', 'Gloo', 'Made Up'], firstWins, counters);
+  expect(ranked.map((r) => r.hero)).toEqual(['Gloo', 'Marcel']);
+  expect(ranked[1].worst).toBeUndefined();
+});
+
+test('a first pick chip names its worst matchup', () => {
+  const r = { hero: 'Marcel', against: 0, alongside: 0, best: null, win: 0.575, worst: { enemy: 'Angela', gain: -0.047 } };
+  expect(pickReason(r)).toBe('57.5% win, worst vs Angela -4.7%');
+  expect(pickReason({ ...r, worst: null })).toBe('57.5% win');
 });
