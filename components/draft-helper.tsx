@@ -19,7 +19,7 @@ import {
 } from '@/lib/draft';
 import { HERO_LANES, HEROES } from '@/lib/heroes';
 import { picksOf } from '@/lib/icons';
-import type { Picks } from '@/lib/matchups';
+import { isRisky, type Picks } from '@/lib/matchups';
 import { DAILY_LIMIT } from '@/lib/quota';
 import {
   loadDraft,
@@ -57,6 +57,8 @@ import { HowTo } from '@/components/how-to';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import type { Ranked } from '@/lib/matchups';
 import { ChangelogDialog } from '@/components/changelog-dialog';
+import { LikelyLine } from '@/components/likely-line';
+import { likelyEnemies } from '@/lib/likely';
 import type { Release } from '@/lib/changelog';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -216,6 +218,18 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   // A hero pick ask carries the board as names, so the server can look up
   // real counters for it. A build ask needs none: the server checks it
   // against the current shop instead.
+  const likely = useMemo(
+    () =>
+      likelyEnemies(meta, draft.picks.enemy, [
+        ...draft.picks.team.map((p) => p.hero),
+        ...draft.bans,
+        ...(draft.myHero ? [draft.myHero] : []),
+      ]),
+    [meta, draft],
+  );
+  const emptyBoard = !draft.picks.enemy.length && !draft.picks.team.length;
+  // My own hero counts: the enemy answers it, and teammates still get advice.
+  const expectEnemy = !emptyBoard || Boolean(draft.myHero);
   const picks = useMemo<Picks>(
     () => ({
       lane: draft.myLane,
@@ -226,8 +240,10 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
       rank: draft.rank,
       // The enemy in my lane: that matchup counts most.
       opponent: draft.picks.enemy.find((p) => p.lane === draft.myLane)?.hero,
+      // Nothing to answer on an empty board: first picks have their own list.
+      ...(expectEnemy && likely.heroes.length > 0 && { likely: likely.heroes }),
     }),
-    [draft, pool],
+    [draft, pool, likely, expectEnemy],
   );
 
   // Ranked again whenever the board changes. A short wait lets a burst of
@@ -607,7 +623,13 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             {!draft.myHero && counts.team < 5 && (
               <PickSuggestions
                 ranked={instant}
-                heading={!picks.enemy.length && !picks.team.length && instant.some((r) => r.worst !== undefined) ? t.safeFirst : undefined}
+                heading={
+                  emptyBoard && instant.some((r) => r.worst !== undefined)
+                    ? instant.some(isRisky)
+                      ? t.strongFirst
+                      : t.safeFirst
+                    : undefined
+                }
                 ai={aiPicks}
                 portraits={portraits}
                 onPick={pickFromChips}
@@ -675,6 +697,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
                     enemy={draft.picks.enemy.map((p) => p.hero)}
                     rank={draft.rank}
                   />
+                )}
+                {side === 'enemy' && expectEnemy && counts.enemy < 5 && (
+                  <LikelyLine likely={likely} showOpen={counts.enemy > 0} portraits={portraits} />
                 )}
                 {side === 'team' &&
                   offLanes.map((o) => (

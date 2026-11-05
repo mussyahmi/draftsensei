@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { PickSuggestions } from '@/components/pick-suggestions';
 import { useT } from '@/components/lang';
 import { LANES, type Lane } from '@/lib/draft';
-import type { Picks, Ranked } from '@/lib/matchups';
+import { isRisky, type Picks, type Ranked } from '@/lib/matchups';
 import { retryUntil } from '@/lib/retry';
 import { chipOff, chipOn, cn } from '@/lib/utils';
 
@@ -81,7 +81,9 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
             ranked={ranked}
             heading={
               ranked.some((r) => r.worst !== undefined)
-                ? t.safeFirstFor(lane.toUpperCase())
+                ? ranked.some(isRisky)
+                  ? t.strongFirstFor(lane.toUpperCase())
+                  : t.safeFirstFor(lane.toUpperCase())
                 : t.teammateBest(lane.toUpperCase())
             }
             portraits={portraits}

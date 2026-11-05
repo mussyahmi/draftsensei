@@ -2,7 +2,7 @@
 
 import { LANES, laneLabel, type Lane } from '@/lib/draft';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { cn } from '@/lib/utils';
+import { chipOff, cn } from '@/lib/utils';
 
 type Props = {
   value: Lane;
@@ -30,6 +30,7 @@ export function LanePicker({ value, onChange, className }: Props) {
           aria-label={laneLabel(lane.key)}
           title={laneLabel(lane.key)}
           className={cn(
+            chipOff,
             'h-10 flex-1 px-2.5 font-display text-xs uppercase tracking-wide aria-pressed:bg-primary/15 aria-pressed:text-primary aria-pressed:ring-1 aria-pressed:ring-inset aria-pressed:ring-primary/50 sm:h-8 sm:flex-none',
           )}
         >

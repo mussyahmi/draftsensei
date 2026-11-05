@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { candidatesFor, pickReason, rankPicks, matchupLines, safeRanked, type Gains } from '../lib/matchups';
+import { candidatesFor, isRisky, pickReason, picksFrom, rankPicks, matchupLines, safeRanked, type Gains } from '../lib/matchups';
 
 // How much each hero's win rate moves against or alongside one picked hero.
 const vsSun: Gains = new Map([['Jawhead', 0.039], ['Saber', 0.031], ['Natan', -0.052]]);
@@ -109,7 +109,7 @@ test('a chip leads with the win rate, so every hero has a number and the order e
   const base = { hero: 'Marcel', against: 0, alongside: 0, best: null, win: 0.575 };
   expect(pickReason(base)).toBe('57.5% win');
   expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 } })).toBe('57.5% win, +0.2% vs Masha');
-  expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 }, partner: { ally: 'Kaja', gain: 0.036 } }, { win: 'menang', with: 'bersama', worst: 'terburuk vs' }))
+  expect(pickReason({ ...base, best: { enemy: 'Masha', gain: 0.002 }, partner: { ally: 'Kaja', gain: 0.036 } }, { win: 'menang', with: 'bersama', worst: 'terburuk vs', likely: 'mungkin' }))
     .toBe('57.5% menang, +0.2% vs Masha, +3.6% bersama Kaja');
 });
 
@@ -122,8 +122,7 @@ test('a strong hero with a hard counter ranks below one that is safer', () => {
     ['Gloo', new Map([['Estes', 0.03]])],
   ]);
   const ranked = safeRanked(['Marcel', 'Diggie', 'Gloo'], firstWins, counters);
-  expect(ranked.map((r) => r.hero)).toEqual(['Diggie', 'Marcel', 'Gloo']);
-  expect(ranked[1].worst).toEqual({ enemy: 'Angela', gain: -0.047 });
+  expect(ranked.map((r) => r.hero)).toEqual(['Diggie', 'Gloo']);
 });
 
 test('a banned hero is no threat to a first pick', () => {
@@ -147,4 +146,69 @@ test('a first pick chip names its worst matchup', () => {
   const r = { hero: 'Marcel', against: 0, alongside: 0, best: null, win: 0.575, worst: { enemy: 'Angela', gain: -0.047 } };
   expect(pickReason(r)).toBe('57.5% win, worst vs Angela -4.7%');
   expect(pickReason({ ...r, worst: null })).toBe('57.5% win');
+});
+
+test('a hero with a counter worse than 4% is not a safe first pick', () => {
+  const counters = new Map<string, Gains>([
+    ['Marcel', new Map([['Angela', 0.047]])],
+    ['Diggie', new Map([['Estes', 0.04]])],
+  ]);
+  const ranked = safeRanked(['Marcel', 'Diggie'], firstWins, counters);
+  expect(ranked.map((r) => r.hero)).toEqual(['Diggie']);
+  expect(ranked.some(isRisky)).toBe(false);
+});
+
+test('with no safe hero left, the risky ones stay and say so', () => {
+  const counters = new Map<string, Gains>([['Marcel', new Map([['Angela', 0.047]])]]);
+  const ranked = safeRanked(['Marcel'], firstWins, counters);
+  expect(ranked.map((r) => r.hero)).toEqual(['Marcel']);
+  expect(ranked.some(isRisky)).toBe(true);
+});
+
+test('a hero whose counters did not load stays behind the safe ones', () => {
+  const counters = new Map<string, Gains>([['Gloo', new Map([['Estes', 0.03]])]]);
+  expect(safeRanked(['Marcel', 'Gloo'], firstWins, counters).map((r) => r.hero)).toEqual(['Gloo', 'Marcel']);
+});
+
+const likelyLing = new Map([['Ling', new Map<string, number>([['Saber', -0.04], ['Jawhead', 0.03]])]]);
+
+test('a hero a likely enemy pick beats moves down, at half the weight of a real pick', () => {
+  const vsTigreal: Gains = new Map([['Saber', 0.015], ['Jawhead', 0]]);
+  const real = new Map([['Tigreal', vsTigreal]]);
+  const before = rankPicks(['Jawhead', 'Saber'], real, new Map());
+  expect(before.map((r) => r.hero)).toEqual(['Saber', 'Jawhead']);
+  const after = rankPicks(['Jawhead', 'Saber'], real, new Map(), undefined, new Map(), [], likelyLing);
+  expect(after.map((r) => r.hero)).toEqual(['Jawhead', 'Saber']);
+  expect(after[1].likely).toEqual({ enemy: 'Ling', gain: -0.04 });
+  // Winning into a likely pick earns nothing: it may never come.
+  expect(after[0].likely).toBeUndefined();
+});
+
+test('a likely pick does not outweigh a much better matchup on the board', () => {
+  const vsTigreal: Gains = new Map([['Saber', 0.05], ['Jawhead', 0]]);
+  const ranked = rankPicks(['Jawhead', 'Saber'], new Map([['Tigreal', vsTigreal]]), new Map(), undefined, new Map(), [], likelyLing);
+  expect(ranked[0].hero).toBe('Saber');
+});
+
+test('a hero is never its own likely counter', () => {
+  const ranked = rankPicks(['Ling'], enemies, new Map([['Tigreal', new Map([['Ling', 0.01]])]]), undefined, new Map(), [], new Map([['Ling', new Map([['Ling', -0.5]])]]));
+  expect(ranked[0].likely).toBeUndefined();
+});
+
+test('the chip names a likely counter only when it is big enough, and says likely', () => {
+  const r = { hero: 'Saber', against: 0, alongside: 0, best: null, win: 0.52, likely: { enemy: 'Ling', gain: -0.031 } };
+  expect(pickReason(r)).toBe('52.0% win, -3.1% vs Ling (likely)');
+  expect(pickReason({ ...r, likely: { enemy: 'Ling', gain: -0.01 } })).toBe('52.0% win');
+  expect(pickReason({ ...r, win: undefined })).toBe('-3.1% vs Ling (likely)');
+});
+
+test('the AI is told a likely counter is only a maybe', () => {
+  const r = { hero: 'Saber', against: 0, alongside: 0, best: null, likely: { enemy: 'Ling', gain: -0.031 } };
+  expect(matchupLines([r], false)[0]).toContain('-3.1% vs ling if the enemy picks it');
+});
+
+test('the browser can name at most three likely picks', () => {
+  const board = { lane: 'exp', enemy: [], team: [], pool: [], likely: ['A', 'B', 'C', 'D'] };
+  expect(picksFrom(board)?.likely).toEqual(['A', 'B', 'C']);
+  expect(picksFrom({ ...board, likely: [] })).not.toHaveProperty('likely');
 });

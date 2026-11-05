@@ -6,6 +6,7 @@ import { HERO_LANES, HERO_OTHER_LANES } from './heroes';
 import { LANES, RANKS, type Lane, type Rank } from './draft';
 import { loadGains, loadMeta } from './arena';
 import { fillsGaps, GAP_BOOST, teamGaps, type Gap } from './team-balance';
+import { LIKELY_SHOWN } from './likely';
 
 // Each hero's win rate change against or alongside one picked hero.
 export type Gains = Map<string, number>;
@@ -26,6 +27,8 @@ export type Ranked = {
   // On an empty board, its hardest counter still open to the enemy, as how much
   // it loses there. Null means nothing really counters it.
   worst?: { enemy: string; gain: number } | null;
+  // Its hardest matchup among the heroes the enemy will likely pick next.
+  likely?: { enemy: string; gain: number };
   // What my team is missing that this hero brings.
   fills?: Gap[];
 };
@@ -45,6 +48,22 @@ export function candidatesFor(
     : Object.keys(lanes).filter((h) => lanes[h] === lane || others[h]?.includes(lane));
   const gone = new Set([...taken, ...bans]);
   return field.filter((h) => !gone.has(h));
+}
+
+// A likely pick is only a guess, so it weighs half of one really on the board.
+const LIKELY_WEIGHT = 0.5;
+
+// Below this a likely counter is not worth a place on the chip: most heroes
+// lose about that much to somebody.
+const LIKELY_SHOWN_FROM = -0.02;
+
+function hardestLikely(likely: Map<string, Gains>, hero: string): Ranked['likely'] {
+  let top: Ranked['likely'];
+  for (const [enemy, table] of likely) {
+    const gain = table.get(hero) ?? 0;
+    if (enemy !== hero && gain < 0 && (!top || gain < top.gain)) top = { enemy, gain };
+  }
+  return top;
 }
 
 // Gains add up across the picks, so a hero good into two enemies beats one
@@ -69,31 +88,50 @@ export function rankPicks(
   opponent?: string,
   wins: Map<string, number> = new Map(),
   gaps: Gap[] = [],
+  likely: Map<string, Gains> = new Map(),
 ): Ranked[] {
   const enemies = [...against.values()];
   const allies = [...alongside.values()];
   const tables = [...enemies, ...allies];
   const lane = opponent ? against.get(opponent) : undefined;
   const score = (r: Ranked) =>
-    (r.win ?? 0.5) - 0.5 + r.against + r.alongside + (r.opponent?.gain ?? 0) + GAP_BOOST * (r.fills?.length ?? 0);
+    (r.win ?? 0.5) -
+    0.5 +
+    r.against +
+    r.alongside +
+    (r.opponent?.gain ?? 0) +
+    GAP_BOOST * (r.fills?.length ?? 0) +
+    LIKELY_WEIGHT * (r.likely?.gain ?? 0);
   return candidates
     .filter((hero) => tables.some((t) => t.has(hero)))
-    .map((hero) => ({
-      hero,
-      against: sum(enemies, hero),
-      alongside: sum(allies, hero),
-      best: bestInto(against, hero),
-      partner: bestWith(alongside, hero),
-      opponent: lane && opponent ? { enemy: opponent, gain: lane.get(hero) ?? 0 } : null,
-      ...(wins.has(hero) && { win: wins.get(hero) }),
-      ...(fillsGaps(hero, gaps).length > 0 && { fills: fillsGaps(hero, gaps) }),
-    }))
+    .map((hero) => {
+      const hardest = hardestLikely(likely, hero);
+      return {
+        hero,
+        against: sum(enemies, hero),
+        alongside: sum(allies, hero),
+        best: bestInto(against, hero),
+        partner: bestWith(alongside, hero),
+        opponent: lane && opponent ? { enemy: opponent, gain: lane.get(hero) ?? 0 } : null,
+        ...(wins.has(hero) && { win: wins.get(hero) }),
+        ...(fillsGaps(hero, gaps).length > 0 && { fills: fillsGaps(hero, gaps) }),
+        ...(hardest && { likely: hardest }),
+      };
+    })
     .sort((a, b) => score(b) - score(a));
 }
+
+// Every hero loses 2 or 3 points to somebody, so "safe" cannot mean no counter
+// at all. Worse than this is a counter the enemy would happily take.
+const SAFE_WORST = -0.04;
+
+export const isRisky = (r: Ranked) => r.worst != null && r.worst.gain < SAFE_WORST;
 
 // The enemy answers a first pick, so a hero that wins a lot but folds to one
 // counter is a risk. Each hero's table says how much every other hero gains
 // against it. Heroes whose table did not load go last, in win rate order.
+// Risky heroes leave the list, unless that would leave no safe hero to show:
+// a small pool still gets its best, and the heading stops saying safe.
 export function safeRanked(
   candidates: string[],
   wins: Map<string, number>,
@@ -107,7 +145,7 @@ export function safeRanked(
     return { enemy, gain: 0 - gain };
   };
   const score = (r: Ranked) => (r.win ?? 0) + (r.worst?.gain ?? 0);
-  return candidates
+  const ranked = candidates
     .filter((hero) => wins.has(hero))
     .map((hero) => {
       const table = counters.get(hero);
@@ -121,6 +159,8 @@ export function safeRanked(
       };
     })
     .sort((a, b) => Number(b.worst !== undefined) - Number(a.worst !== undefined) || score(b) - score(a));
+  const safe = ranked.filter((r) => r.worst != null && !isRisky(r));
+  return safe.length ? ranked.filter((r) => !isRisky(r)) : ranked;
 }
 
 // Only a real gain counts as a counter or a partner; doing least badly
@@ -156,7 +196,10 @@ export function matchupLines(ranked: Ranked[], withTeam: boolean) {
       (r.opponent ? `, vs lane opponent ${r.opponent.enemy.toLowerCase()} ${percent(r.opponent.gain)}` : '') +
       (withTeam ? `, ${percent(r.alongside)} with my team` : '') +
       (withTeam && r.partner ? ` (best with ${r.partner.ally.toLowerCase()} ${percent(r.partner.gain)})` : '') +
-      (r.fills?.length ? `, adds the ${r.fills.join(' and ')} my team is missing` : ''),
+      (r.fills?.length ? `, adds the ${r.fills.join(' and ')} my team is missing` : '') +
+      (r.likely && r.likely.gain <= LIKELY_SHOWN_FROM
+        ? `, ${percent(r.likely.gain)} vs ${r.likely.enemy.toLowerCase()} if the enemy picks it`
+        : ''),
   );
 }
 
@@ -170,6 +213,8 @@ export type Picks = {
   // The enemy picked into my lane, if any yet.
   opponent?: string;
   rank?: Rank;
+  // Who the enemy will likely pick next: a guess, weighed lightly.
+  likely?: string[];
 };
 
 const names = (v: unknown) =>
@@ -185,6 +230,7 @@ export function picksFrom(v: unknown): Picks | null {
   const bans = names(o.bans) ?? [];
   const opponent = typeof o.opponent === 'string' && enemy.includes(o.opponent) ? o.opponent : undefined;
   const rank = RANKS.find((r) => r.key === o.rank)?.key;
+  const likely = (names(o.likely) ?? []).slice(0, LIKELY_SHOWN);
   return {
     lane,
     enemy,
@@ -193,6 +239,7 @@ export function picksFrom(v: unknown): Picks | null {
     ...(bans.length && { bans }),
     ...(opponent && { opponent }),
     ...(rank && { rank }),
+    ...(likely.length && { likely }),
   };
 }
 
@@ -227,10 +274,11 @@ export async function rankedFor(
     return { ranked: safeRanked(strongest, wins, counters, new Set(picks.bans)).slice(0, count), withTeam: false };
   }
   // Without win rates the matchups alone still rank the heroes.
-  const [against, alongside, meta] = await Promise.all([
+  const [against, alongside, meta, likely] = await Promise.all([
     loaded(picks.enemy, 'counters', rank),
     loaded(picks.team, 'teammates', rank),
     loadMeta(rank).catch(() => []),
+    loaded(picks.likely ?? [], 'counters', rank),
   ]);
   const candidates = candidatesFor(
     picks.lane,
@@ -246,6 +294,7 @@ export async function rankedFor(
     picks.opponent,
     new Map(meta.map((m) => [m.hero, m.win])),
     teamGaps(picks.team),
+    new Map(likely),
   ).slice(0, count);
   return { ranked, withTeam: alongside.length > 0 };
 }
@@ -263,7 +312,12 @@ export async function matchupData(picks: Picks): Promise<string[]> {
 // pick that is there for a combo says so.
 export function pickReason(
   r: Ranked,
-  words: { win: string; with: string; worst: string } = { win: 'win', with: 'with', worst: 'worst vs' },
+  words: { win: string; with: string; worst: string; likely: string } = {
+    win: 'win',
+    with: 'with',
+    worst: 'worst vs',
+    likely: 'likely',
+  },
 ): string | null {
   const lane = r.opponent && r.opponent.gain > 0 ? r.opponent : null;
   const into = lane && (!r.best || lane.gain >= r.best.gain) ? lane : r.best;
@@ -272,13 +326,18 @@ export function pickReason(
     r.partner && [percent(r.partner.gain), `${words.with} ${r.partner.ally}`],
   ].filter((p): p is string[] => Boolean(p));
   const gains = (first: string) => parts.map(([n, who], i) => (i === 0 ? `${n}${first} ${who}` : `${n} ${who}`));
+  const likely =
+    r.likely && r.likely.gain <= LIKELY_SHOWN_FROM
+      ? [`${percent(r.likely.gain)} vs ${r.likely.enemy} (${words.likely})`]
+      : [];
   // "57.5% win, +1.2% vs Layla, +3.6% with Kaja": "win" once, on the first number.
   if (r.win != null) {
     return [
       `${(r.win * 100).toFixed(1)}% ${words.win}`,
       ...gains(''),
       ...(r.worst ? [`${words.worst} ${r.worst.enemy} ${percent(r.worst.gain)}`] : []),
+      ...likely,
     ].join(', ');
   }
-  return parts.length ? gains(` ${words.win}`).join(', ') : null;
+  return parts.length || likely.length ? [...gains(` ${words.win}`), ...likely].join(', ') : null;
 }

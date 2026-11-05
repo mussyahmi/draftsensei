@@ -6,12 +6,14 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import { AccountButton } from '@/components/account-button';
+import { ChangelogDialog } from '@/components/changelog-dialog';
 import { LangProvider } from '@/components/lang';
 import { SiteHeader } from '@/components/site-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { WinRate } from '@/components/win-rate';
 import type { MetaHero } from '@/lib/bans';
+import type { Release } from '@/lib/changelog';
 import { LANES, newPool, RANKS, searchHeroes, type Lane, type Pool, type Rank } from '@/lib/draft';
 import type { HeroDetail, HeroEdge } from '@/lib/hero-detail';
 import { HERO_LANES, HERO_OTHER_LANES, HEROES, playsLane } from '@/lib/heroes';
@@ -175,7 +177,8 @@ function HeroPanel({
 
 // Every hero's numbers at my rank, for choosing what to learn between games.
 // It shares the rank, language and My heroes the draft page keeps.
-export function HeroesPage() {
+export function HeroesPage({ releases }: { releases: Release[] }) {
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const [lang, setLang] = useState<Lang>('en');
   const [rank, setRank] = useState<Rank>('all');
   const [pool, setPool] = useState<Pool>(newPool);
@@ -256,6 +259,7 @@ export function HeroesPage() {
           setLang(next);
           saveSettings({ lang: next });
         }}
+        onVersion={() => setChangelogOpen(true)}
       >
         {firebaseReady && (
           <AccountButton
@@ -398,6 +402,8 @@ export function HeroesPage() {
           </div>
         )}
       </main>
+
+      <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} releases={releases} />
     </LangProvider>
   );
 }

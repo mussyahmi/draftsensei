@@ -6,6 +6,18 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.10.0] - 2026-11-05
+
+### Added
+- Enemy's likely picks: under the enemy list, the lanes they still need and up to three heroes they may pick next, from what is most picked at your rank. Suggestions lean slightly away from heroes those picks would counter, and the chip says so, marked "likely".
+
+### Changed
+- Safe first picks leave out a hero with a counter worse than 4%. If no safe hero is left, the heading says these are the strongest and each has a big counter.
+- Lane buttons in I'm playing look the same as the other lane buttons when not selected.
+
+### Fixed
+- The version on the Heroes page opens What's new again.
+
 ## [0.9.0] - 2026-11-04
 
 ### Added

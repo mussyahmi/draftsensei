@@ -8,8 +8,8 @@ import type { Lang } from '@/lib/i18n';
 type Props = {
   lang: Lang;
   onLang: (lang: Lang) => void;
-  // Where the changelog is on hand, the version opens it.
-  onVersion?: () => void;
+  // The version opens the changelog.
+  onVersion: () => void;
   // A short note between the name and the links.
   note?: ReactNode;
   // The links for this page.
@@ -27,18 +27,14 @@ export function SiteHeader({ lang, onLang, onVersion, note, children }: Props) {
         <div className="flex w-full items-center gap-1.5 sm:w-auto sm:gap-3">
           <div className="flex items-baseline gap-1.5">
             <h1 className="font-display text-xl uppercase tracking-wider">DraftSensei</h1>
-            {onVersion ? (
-              <button
-                type="button"
-                onClick={onVersion}
-                title={t.whatsNew}
-                className="-my-2 py-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                {version}
-              </button>
-            ) : (
-              <span className="text-xs text-muted-foreground">{version}</span>
-            )}
+            <button
+              type="button"
+              onClick={onVersion}
+              title={t.whatsNew}
+              className="-my-2 py-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              {version}
+            </button>
           </div>
           {/* Beside the languages on both layouts: help before them where the
               phone has the space, after them on a wide bar. */}
