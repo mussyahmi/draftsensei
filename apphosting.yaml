@@ -14,6 +14,13 @@ env:
     availability:
       - RUNTIME
 
+  # Who can open /stats. Kept out of the repo like the key above:
+  #   firebase apphosting:secrets:set OWNER_EMAIL
+  - variable: OWNER_EMAIL
+    secret: OWNER_EMAIL
+    availability:
+      - RUNTIME
+
   # Public by design: these name the Firebase project and ship in the page.
   # They are needed at build time so Next can inline them.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY

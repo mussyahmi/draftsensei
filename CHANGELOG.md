@@ -6,6 +6,12 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.11.0] - 2026-11-06
+
+### Added
+- Best lanes this week, on the Heroes page: each lane ranked by its top 3 heroes at your rank, leaving out heroes banned in over a third of games, with your own best lane from My heroes. Tap a lane to see all its heroes.
+- Page opens are counted, one number a day with nothing about who opened it, so the app's owner can see whether people use it.
+
 ## [0.10.0] - 2026-11-05
 
 ### Added

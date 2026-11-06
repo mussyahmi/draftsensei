@@ -21,6 +21,7 @@ import { HERO_LANES, HEROES } from '@/lib/heroes';
 import { picksOf } from '@/lib/icons';
 import { isRisky, type Picks } from '@/lib/matchups';
 import { DAILY_LIMIT } from '@/lib/quota';
+import { countVisit } from '@/lib/visit';
 import {
   loadDraft,
   loadPool,
@@ -153,6 +154,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   // Everyone shares one daily allowance, so show how much of it is gone. Asks
   // keep it current after this.
   useEffect(() => {
+    countVisit('draft');
     fetch('/api/usage')
       .then((r) => (r.ok ? r.json() : null))
       .then((u: { used: number | null } | null) => {

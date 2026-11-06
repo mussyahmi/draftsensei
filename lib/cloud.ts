@@ -41,3 +41,6 @@ export async function loadRemote(uid: string): Promise<Snapshot | null> {
 
 export const saveRemote = (uid: string, snapshot: Snapshot) =>
   setDoc(snapshotDoc(uid), snapshot);
+
+/** Proof of who is signed in, for a server route that checks it. */
+export const idToken = () => firebase().auth.currentUser?.getIdToken() ?? Promise.resolve(null);

@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import { AccountButton } from '@/components/account-button';
+import { BestLanes } from '@/components/best-lanes';
 import { ChangelogDialog } from '@/components/changelog-dialog';
 import { LangProvider } from '@/components/lang';
 import { SiteHeader } from '@/components/site-header';
@@ -13,6 +14,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { WinRate } from '@/components/win-rate';
 import type { MetaHero } from '@/lib/bans';
+import { bestLanes, usualLanes } from '@/lib/best-lanes';
 import type { Release } from '@/lib/changelog';
 import { LANES, newPool, RANKS, searchHeroes, type Lane, type Pool, type Rank } from '@/lib/draft';
 import type { HeroDetail, HeroEdge } from '@/lib/hero-detail';
@@ -22,6 +24,7 @@ import { firebaseReady } from '@/lib/firebase';
 import { STRINGS, langFor, type Lang, type Strings } from '@/lib/i18n';
 import { loadDraft, loadPool, savePool, saveDraft } from '@/lib/storage';
 import { retryUntil } from '@/lib/retry';
+import { countVisit } from '@/lib/visit';
 import { chipOff, chipOn, cn } from '@/lib/utils';
 
 type SortKey = 'win' | 'ban' | 'pick';
@@ -207,6 +210,7 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
   }, []);
 
   useEffect(() => {
+    countVisit('heroes');
     fetch('/api/portraits')
       .then((r) => (r.ok ? r.json() : {}))
       .then(setPortraits)
@@ -237,6 +241,8 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
   };
 
   const heroes = meta?.rank === rank ? meta.heroes : null;
+  const lanes = heroes ? bestLanes(heroes, usualLanes()) : [];
+  const mine = heroes ? bestLanes(heroes, pool) : [];
   const found = query.trim() ? new Set(searchHeroes(query, HEROES)) : null;
   const shown = (heroes ?? [])
     .filter((m) => (lane === 'all' || playsLane(m.hero, lane)) && (!found || found.has(m.hero)))
@@ -284,6 +290,8 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
           <h2 className="font-display text-lg uppercase tracking-wide">{t.heroesTitle}</h2>
           <p className="text-sm text-muted-foreground">{t.heroesHint}</p>
         </div>
+
+        <BestLanes lanes={lanes} mine={mine} selected={lane} portraits={portraits} onLane={setLane} />
 
         <div className="grid gap-2 sm:grid-cols-2">
           <Input

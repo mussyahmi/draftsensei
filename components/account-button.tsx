@@ -1,7 +1,9 @@
 'use client';
 
-import { Cloud, CloudAlert, LogIn, LogOut, Loader2 } from 'lucide-react';
-import type { Account } from '@/lib/cloud';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ChartColumn, Cloud, CloudAlert, LogIn, LogOut, Loader2 } from 'lucide-react';
+import { idToken, type Account } from '@/lib/cloud';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +26,27 @@ type Props = {
 
 export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: Props) {
   const t = useT();
+  const router = useRouter();
+  // Only the owner's menu offers Stats; the server says who that is.
+  const [owner, setOwner] = useState<string | null>(null);
+  const uid = account?.uid;
+  useEffect(() => {
+    if (!uid) return;
+    let current = true;
+    idToken()
+      .then((token) => (token ? fetch('/api/owner', { headers: { authorization: `Bearer ${token}` } }) : null))
+      .then((r) => r?.json())
+      .then((answer: { owner?: boolean } | undefined) => {
+        if (current && answer?.owner) setOwner(uid);
+      })
+      .catch(() => {
+        /* no Stats in the menu */
+      });
+    return () => {
+      current = false;
+    };
+  }, [uid]);
+
   if (!account) {
     return (
       <Button variant="ghost" size="sm" className="h-9 sm:h-7" onClick={onSignIn}>
@@ -73,6 +96,12 @@ export function AccountButton({ account, busy, problem, onSignIn, onSignOut }: P
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {owner === account.uid && (
+          <DropdownMenuItem onClick={() => router.push('/stats')}>
+            <ChartColumn className="size-3.5" />
+            {t.stats}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={onSignOut}>
           <LogOut className="size-3.5" />
           {t.signOut}
