@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { GameImage } from '@/components/game-image';
 import { useT } from '@/components/lang';
 import type { Rank } from '@/lib/draft';
 import type { DraftCheck } from '@/lib/draft-check';
@@ -13,6 +14,7 @@ type Props = {
   me: string | null;
   opponent: string | null;
   rank: Rank;
+  portraits: Record<string, string | null>;
 };
 
 // Half a point across every matchup is noise, not a lead.
@@ -29,11 +31,21 @@ function Gain({ value }: { value: number }) {
   );
 }
 
+// A face is read faster than a name. Without one the name shows alone.
+function Hero({ name, portraits }: { name: string; portraits: Record<string, string | null> }) {
+  return (
+    <span className="inline-flex items-center gap-1 align-bottom">
+      {portraits[name] && <GameImage src={portraits[name]!} className="size-5 shrink-0 rounded-full" />}
+      {name}
+    </span>
+  );
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-sm">{children}</dd>
+      <dd className="text-sm [&>.block+.block]:mt-1">{children}</dd>
     </div>
   );
 }
@@ -51,7 +63,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 // What the finished draft looks like before the game loads. The picks are
 // locked by now, so it says what to expect; it has nothing left to suggest.
-export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
+export function DraftCheckCard({ team, enemy, me, opponent, rank, portraits }: Props) {
   const t = useT();
   const asked = JSON.stringify({ team, enemy, me, opponent, rank });
   const [answer, setAnswer] = useState<{ asked: string; check: DraftCheck } | null>(null);
@@ -96,9 +108,9 @@ export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
               <Row label={t.checkThreat(threats.length)}>
                 {threats.map((threat) => (
                   <span key={threat.enemy} className="block">
-                    <span className="font-medium">{threat.enemy}</span>{' '}
+                    <span className="font-medium"><Hero name={threat.enemy} portraits={portraits} /></span>{' '}
                     <span className="text-muted-foreground">
-                      ({threat.hero} <Gain value={threat.gain} />)
+                      (<Hero name={threat.hero} portraits={portraits} /> <Gain value={threat.gain} />)
                     </span>
                   </span>
                 ))}
@@ -106,7 +118,7 @@ export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
             )}
             {strongest && (
               <Row label={t.checkStrongest}>
-                {strongest.enemy} <span className="text-muted-foreground">{t.checkWinRate(percent(strongest.win))}</span>
+                <Hero name={strongest.enemy} portraits={portraits} /> <span className="text-muted-foreground">{t.checkWinRate(percent(strongest.win))}</span>
               </Row>
             )}
           </Group>
@@ -115,26 +127,26 @@ export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
           <Group title={t.checkMe}>
             {lane && (
               <Row label={t.checkLane}>
-                {lane.me} vs {lane.enemy} <Gain value={lane.gain} />
+                <Hero name={lane.me} portraits={portraits} /> vs <Hero name={lane.enemy} portraits={portraits} /> <Gain value={lane.gain} />
               </Row>
             )}
             {matchups && (
               <Row label={t.checkMatchups}>
                 {matchups.best && (
                   <span className="block">
-                    {t.checkBest(matchups.best.enemy)} <Gain value={matchups.best.gain} />
+                    {t.checkBest} <Hero name={matchups.best.enemy} portraits={portraits} /> <Gain value={matchups.best.gain} />
                   </span>
                 )}
                 {matchups.worst && (
                   <span className="block">
-                    {t.checkWorst(matchups.worst.enemy)} <Gain value={matchups.worst.gain} />
+                    {t.checkWorst} <Hero name={matchups.worst.enemy} portraits={portraits} /> <Gain value={matchups.worst.gain} />
                   </span>
                 )}
               </Row>
             )}
             {partner && (
               <Row label={t.checkPartner}>
-                {partner.me} + {partner.ally} <Gain value={partner.gain} />
+                <Hero name={partner.me} portraits={portraits} /> + <Hero name={partner.ally} portraits={portraits} /> <Gain value={partner.gain} />
               </Row>
             )}
           </Group>
@@ -163,19 +175,19 @@ export function DraftCheckCard({ team, enemy, me, opponent, rank }: Props) {
                 </span>
                 {counters.best && (
                   <span className="block text-muted-foreground">
-                    {counters.best.hero} vs {counters.best.enemy} <Gain value={counters.best.gain} />
+                    <Hero name={counters.best.hero} portraits={portraits} /> vs <Hero name={counters.best.enemy} portraits={portraits} /> <Gain value={counters.best.gain} />
                   </span>
                 )}
                 {counters.worst && (
                   <span className="block text-muted-foreground">
-                    {counters.worst.hero} vs {counters.worst.enemy} <Gain value={counters.worst.gain} />
+                    <Hero name={counters.worst.hero} portraits={portraits} /> vs <Hero name={counters.worst.enemy} portraits={portraits} /> <Gain value={counters.worst.gain} />
                   </span>
                 )}
               </Row>
             )}
             {combo && (
               <Row label={t.checkPair}>
-                {combo.a} + {combo.b} <Gain value={combo.gain} />
+                <Hero name={combo.a} portraits={portraits} /> + <Hero name={combo.b} portraits={portraits} /> <Gain value={combo.gain} />
               </Row>
             )}
             <Row label={t.checkDamage}>

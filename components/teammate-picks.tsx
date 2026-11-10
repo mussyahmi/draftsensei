@@ -22,7 +22,7 @@ type Props = {
 export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
   const t = useT();
   const [chosen, setChosen] = useState<Lane | null>(null);
-  const [answer, setAnswer] = useState<{ asked: string; ranked: Ranked[] } | null>(null);
+  const [answer, setAnswer] = useState<{ asked: string; lane: Lane; ranked: Ranked[] } | null>(null);
   const open = LANES.map((l) => l.key).filter((l) => !closed.includes(l));
   const lane = chosen && open.includes(chosen) ? chosen : null;
   // A teammate's list is theirs, so my own heroes do not limit it.
@@ -43,7 +43,7 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
           }).then((r) => (r.ok ? r.json() : [])),
         [],
         (ranked) => ranked.length > 0 && (!empty || ranked.some((r) => r.worst !== undefined)),
-        (ranked) => setAnswer({ asked, ranked }),
+        (ranked) => setAnswer({ asked, lane: board.lane, ranked }),
       );
     }, 250);
     return () => {
@@ -53,7 +53,12 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
   }, [asked]);
 
   if (!open.length) return null;
-  const ranked = answer?.asked === asked ? answer.ranked : [];
+  // A new board keeps the lane's last heroes up until the new ones come, so
+  // nothing flickers mid-draft. Another lane's heroes would be wrong, so a
+  // new lane waits in grey.
+  const waiting = !answer || answer.lane !== lane;
+  const ranked = waiting ? [] : answer.ranked;
+  const empty = !board.enemy.length && !board.team.length;
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">{t.helpTeammate}</p>
@@ -79,8 +84,11 @@ export function TeammatePicks({ board, closed, portraits, onAdd }: Props) {
         <div className="pt-2">
           <PickSuggestions
             ranked={ranked}
+            waiting={waiting}
+            // Said from the start, so the line does not change while the
+            // numbers come in.
             heading={
-              ranked.some((r) => r.worst !== undefined)
+              empty
                 ? ranked.some(isRisky)
                   ? t.strongFirstFor(lane.toUpperCase())
                   : t.safeFirstFor(lane.toUpperCase())

@@ -12,6 +12,7 @@ import { LangProvider } from '@/components/lang';
 import { SiteHeader } from '@/components/site-header';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { WinRate } from '@/components/win-rate';
 import type { MetaHero } from '@/lib/bans';
 import { bestLanes, usualLanes } from '@/lib/best-lanes';
@@ -33,6 +34,55 @@ const lanesOf = (hero: string): Lane[] => [
   ...(HERO_LANES[hero] ? [HERO_LANES[hero]] : []),
   ...(HERO_OTHER_LANES[hero] ?? []),
 ];
+
+// The table's columns, shared with its loading rows so nothing moves when the
+// numbers arrive.
+const ROW = 'grid grid-cols-[1fr_repeat(3,3.25rem)_1rem] items-center gap-1 px-3 sm:grid-cols-[1fr_repeat(3,6rem)_1rem]';
+
+// Grey stand-ins in the shape of what is coming, so the page does not jump.
+function ListLoading({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} className="rounded-lg border border-border">
+      <div className={cn(ROW, 'min-h-10')}>
+        <Skeleton className="h-3 w-16" />
+      </div>
+      <ul>
+        {Array.from({ length: 8 }, (_, i) => (
+          <li key={i} className={cn(ROW, 'min-h-11 border-t border-border py-1.5')}>
+            <span className="flex items-center gap-2">
+              <Skeleton className="size-8 shrink-0 rounded-full" />
+              <Skeleton className="h-3 w-24" />
+            </span>
+            <Skeleton className="h-3 w-10 justify-self-end" />
+            <Skeleton className="h-3 w-8 justify-self-end" />
+            <Skeleton className="h-3 w-8 justify-self-end" />
+            <span />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function DetailLoading({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} className="grid gap-4 sm:grid-cols-3">
+      {Array.from({ length: 3 }, (_, col) => (
+        <div key={col} className="space-y-1.5">
+          <Skeleton className="h-3 w-20" />
+          <ul className="space-y-1">
+            {Array.from({ length: 3 }, (_, i) => (
+              <li key={i} className="flex min-h-6 items-center gap-2">
+                <Skeleton className="size-6 rounded-full" />
+                <Skeleton className="h-3 w-20" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const percent = (n: number | undefined) => (n == null ? '-' : `${(n * 100).toFixed(1)}%`);
 
@@ -163,7 +213,7 @@ function HeroPanel({
         </button>
       </div>
 
-      {!info && <p className="text-sm text-muted-foreground">{t.heroLoading}</p>}
+      {!info && <DetailLoading label={t.heroLoading} />}
       {info && !info.value && <p className="text-sm text-muted-foreground">{t.heroNoData}</p>}
       {info?.value && (
         <div className="grid gap-4 sm:grid-cols-3">
@@ -291,7 +341,7 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
           <p className="text-sm text-muted-foreground">{t.heroesHint}</p>
         </div>
 
-        <BestLanes lanes={lanes} mine={mine} selected={lane} portraits={portraits} onLane={setLane} />
+        <BestLanes loading={!heroes} lanes={lanes} mine={mine} selected={lane} portraits={portraits} onLane={setLane} />
 
         <div className="grid gap-2 sm:grid-cols-2">
           <Input
@@ -340,12 +390,12 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
           ))}
         </div>
 
-        {!heroes && <p className="text-sm text-muted-foreground">{t.heroLoading}</p>}
+        {!heroes && <ListLoading label={t.heroLoading} />}
         {heroes && !heroes.length && <p className="text-sm text-muted-foreground">{t.heroNoData}</p>}
         {heroes && heroes.length > 0 && (
           <div className="rounded-lg border border-border">
             {/* The titles stay in view down all 133 rows. */}
-            <div className="sticky top-0 z-10 grid grid-cols-[1fr_repeat(3,3.25rem)_1rem] items-center gap-1 rounded-t-lg bg-card px-3 sm:grid-cols-[1fr_repeat(3,6rem)_1rem]">
+            <div className={cn(ROW, 'sticky top-0 z-10 rounded-t-lg bg-card')}>
               <span className="text-xs text-muted-foreground">
                 {t.heroCount(shown.length)}
               </span>
@@ -376,7 +426,7 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
                     type="button"
                     aria-expanded={open === m.hero}
                     onClick={() => setOpen((o) => (o === m.hero ? null : m.hero))}
-                    className="grid min-h-11 w-full grid-cols-[1fr_repeat(3,3.25rem)_1rem] items-center gap-1 px-3 py-1.5 text-start hover:bg-secondary sm:grid-cols-[1fr_repeat(3,6rem)_1rem]"
+                    className={cn(ROW, 'min-h-11 w-full py-1.5 text-start hover:bg-secondary')}
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       {portraits[m.hero] ? (

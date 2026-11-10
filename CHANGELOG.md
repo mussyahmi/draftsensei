@@ -6,6 +6,16 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.12.0] - 2026-11-10
+
+### Added
+- Hero portraits in Draft check, next to every hero name.
+
+### Changed
+- While heroes load, grey placeholders hold their place instead of a "Loading..." line or an empty gap: the hero list, Best lanes, a hero's details, your pick suggestions and Help a teammate choose. Nothing jumps when they arrive.
+- Changing your lane or rank greys out the pick suggestions until the new lane's heroes come, instead of showing the old lane's heroes for a moment.
+- On an empty board the heading says "Safe first picks" from the start, so it no longer swaps while the numbers load.
+
 ## [0.11.0] - 2026-11-06
 
 ### Added

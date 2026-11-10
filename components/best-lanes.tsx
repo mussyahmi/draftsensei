@@ -2,12 +2,15 @@
 
 import { GameImage } from '@/components/game-image';
 import { useT } from '@/components/lang';
+import { Skeleton } from '@/components/ui/skeleton';
 import { WinRate } from '@/components/win-rate';
 import { CLOSE, type LaneStrength } from '@/lib/best-lanes';
 import type { Lane } from '@/lib/draft';
 import { cn } from '@/lib/utils';
 
 type Props = {
+  // The numbers are still on their way: the card holds its place in grey.
+  loading?: boolean;
   lanes: LaneStrength[];
   // The same, from My heroes only, when any are set.
   mine: LaneStrength[];
@@ -32,8 +35,37 @@ function Heroes({ s, portraits }: { s: LaneStrength; portraits: Record<string, s
 
 // For a solo player free to take any role: where the strong heroes are this
 // week. Tapping a lane shows all its heroes below.
-export function BestLanes({ lanes, mine, selected, portraits, onLane }: Props) {
+export function BestLanes({ loading, lanes, mine, selected, portraits, onLane }: Props) {
   const t = useT();
+  if (loading) {
+    return (
+      <section role="status" aria-label={t.heroLoading} className="space-y-3 rounded-lg border border-border bg-card/40 p-3">
+        <div>
+          <h3 className="font-display text-sm uppercase tracking-wide">{t.bestLanesTitle}</h3>
+          <p className="text-xs text-muted-foreground">{t.bestLanesHint}</p>
+        </div>
+        <ul className="space-y-1">
+          {Array.from({ length: 5 }, (_, i) => (
+            <li
+              key={i}
+              className="grid grid-cols-[3.75rem_1fr] items-center gap-2 px-2 py-1.5 sm:grid-cols-[4.5rem_4rem_1fr]"
+            >
+              <span className="flex flex-col gap-1.5 sm:contents">
+                <Skeleton className="h-3 w-10" />
+                <Skeleton className="h-3 w-12" />
+              </span>
+              <span className="flex items-center gap-2">
+                <Skeleton className="size-5 rounded-full" />
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="size-5 rounded-full" />
+                <Skeleton className="hidden h-3 w-16 sm:block" />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
   if (!lanes.length) return null;
   const close = lanes.length > 1 && lanes[0].win - lanes[1].win < CLOSE;
   return (

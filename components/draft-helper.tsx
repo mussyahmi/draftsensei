@@ -123,6 +123,11 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   const wins = winsBy(meta);
   // The best heroes for my lane as the board stands, from match data alone.
   const [instant, setInstant] = useState<Ranked[]>([]);
+  // The lane and rank the chips were last answered for. Until an answer for
+  // the current ones comes, right or empty, the chips hold their place in
+  // grey: another lane's heroes would be wrong, and none would look like
+  // there is nothing to pick.
+  const [picksFor, setPicksFor] = useState<string | null>(null);
   // The Academy's winning build for my hero, shown before any ask. Kept
   // with the hero it is for, so a changed hero never shows the old build.
   const [topBuild, setTopBuild] = useState<(TopBuild & { for: string }) | null>(null);
@@ -247,6 +252,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     }),
     [draft, pool, likely, expectEnemy],
   );
+  const picksWaiting = picksFor !== `${draft.myLane}|${draft.rank}`;
 
   // Ranked again whenever the board changes. A short wait lets a burst of
   // edits settle into one request, and a late answer for an older board is
@@ -254,6 +260,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   useEffect(() => {
     if (!hydrated) return;
     const empty = !picks.enemy.length && !picks.team.length;
+    const asked = `${picks.lane}|${picks.rank}`;
     let stop = () => {};
     const timer = setTimeout(() => {
       stop = retryUntil<Ranked[]>(
@@ -266,7 +273,10 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
         [],
         // On an empty board, win rates alone are not yet the safe picks.
         (ranked) => ranked.length > 0 && (!empty || ranked.some((r) => r.worst !== undefined)),
-        setInstant,
+        (ranked) => {
+          setInstant(ranked);
+          setPicksFor(asked);
+        },
       );
     }, 250);
     return () => {
@@ -624,10 +634,13 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
             {/* A full team has no pick left to suggest. */}
             {!draft.myHero && counts.team < 5 && (
               <PickSuggestions
-                ranked={instant}
+                ranked={picksWaiting ? [] : instant}
+                waiting={picksWaiting}
                 heading={
-                  emptyBoard && instant.some((r) => r.worst !== undefined)
-                    ? instant.some(isRisky)
+                  // Said from the start, so the line does not change under
+                  // the player while the numbers come in.
+                  emptyBoard
+                    ? !picksWaiting && instant.some(isRisky)
                       ? t.strongFirst
                       : t.safeFirst
                     : undefined
@@ -744,6 +757,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
               me={draft.myHero || draft.picks.team.find((p) => p.lane === draft.myLane)?.hero || null}
               opponent={draft.picks.enemy.find((p) => p.lane === draft.myLane)?.hero ?? null}
               rank={draft.rank}
+              portraits={portraits}
             />
           )}
         </section>
