@@ -6,6 +6,14 @@ the steps before each deploy.
 
 ## Unreleased
 
+## [0.13.0] - 2026-11-16
+
+### Added
+- Patch 2.2.23 marks: an up arrow on buffed heroes, a down arrow on nerfed ones and a dot on changed ones, wherever heroes show. Open a hero on the Heroes page to read what changed, in the patch notes' own words.
+- "Changed this patch" on the Heroes page shows only the heroes the patch touched.
+- For a week after a patch, a short notice says win rates still include games from before it.
+- The Heroes page says which patch it is and how long ago the numbers were updated.
+
 ## [0.12.0] - 2026-11-10
 
 ### Added

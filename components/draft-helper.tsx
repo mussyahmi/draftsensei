@@ -54,6 +54,7 @@ import { BanList } from '@/components/ban-list';
 import { winsBy, type MetaHero } from '@/lib/bans';
 import { enemyDamage, offLane, teamGaps } from '@/lib/team-balance';
 import { PickSuggestions } from '@/components/pick-suggestions';
+import { isSettling, PATCH } from '@/lib/patch';
 import { HowTo } from '@/components/how-to';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import type { Ranked } from '@/lib/matchups';
@@ -142,6 +143,9 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
   // Nothing in localStorage exists during the server render, so load after mount
   // and hold off saving until it is in.
   const [hydrated, setHydrated] = useState(false);
+  // A new patch, so this week's numbers are partly from before it. Depends on
+  // today, so it is worked out in the browser, not at build time.
+  const [settling, setSettling] = useState(false);
 
   // Reading localStorage is exactly the "subscribe to an external system"
   // case: it cannot happen during the server render, so the first paint uses
@@ -152,6 +156,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
     // Nothing saved yet means a first visit: start in the phone's language.
     setDraft(saved.updatedAt ? saved.draft : { ...saved.draft, lang: langFor(navigator.language) });
     setPool(loadPool());
+    setSettling(isSettling(new Date()));
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -629,6 +634,7 @@ export function DraftHelper({ releases }: { releases: Release[] }) {
 
         <section className="space-y-6 border-t border-border pt-8">
           <PhaseTitle n={2}>{t.picks}</PhaseTitle>
+          {settling && <p className="text-xs text-primary">{t.patchSettling(PATCH.version)}</p>}
           {/* Above the lists, so a new pick never pushes them out of sight. */}
           <div ref={chipsRef} className="scroll-mt-4 empty:hidden">
             {/* A full team has no pick left to suggest. */}

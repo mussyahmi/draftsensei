@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { withThreats } from '@/lib/bans';
-import { loadGains, loadMeta } from '@/lib/arena';
+import { loadGains, loadMeta, metaFetchedAt } from '@/lib/arena';
 import { RANKS } from '@/lib/draft';
 import { HEROES } from '@/lib/heroes';
 
@@ -22,6 +22,8 @@ export async function GET(request: Request) {
     r.status === 'fulfilled' ? [[mine[i], r.value] as const] : [],
   );
   return NextResponse.json(withThreats(meta, counters), {
-    headers: { 'cache-control': 'public, max-age=3600' },
+    // When these numbers came from the source, so the page can say how fresh
+    // they are. Cached along with them, so it stays true.
+    headers: { 'cache-control': 'public, max-age=3600', 'x-data-at': String(metaFetchedAt(rank) ?? Date.now()) },
   });
 }

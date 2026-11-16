@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
+import { PatchMark } from '@/components/patch-mark';
 import { useT } from '@/components/lang';
 import type { Rank } from '@/lib/draft';
 import type { DraftCheck } from '@/lib/draft-check';
@@ -37,6 +38,7 @@ function Hero({ name, portraits }: { name: string; portraits: Record<string, str
     <span className="inline-flex items-center gap-1 align-bottom">
       {portraits[name] && <GameImage src={portraits[name]!} className="size-5 shrink-0 rounded-full" />}
       {name}
+      <PatchMark hero={name} />
     </span>
   );
 }

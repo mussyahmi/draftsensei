@@ -99,6 +99,9 @@ function remember<T>(key: string, load: () => Promise<T>, now: number): Promise<
 
 export const forgetArena = () => cache.clear();
 
+// When the copy now being served was fetched from the source, if there is one.
+export const fetchedAt = (key: string) => cache.get(key)?.at;
+
 export const loadCatalog = (now = Date.now()) =>
   remember(
     'catalog',
@@ -243,3 +246,5 @@ export const loadMeta = (rank: Rank = 'all', now = Date.now()): Promise<MetaHero
       ),
     now,
   );
+
+export const metaFetchedAt = (rank: Rank = 'all') => fetchedAt(`meta:${rank}`);

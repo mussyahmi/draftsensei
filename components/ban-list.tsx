@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
+import { PatchMark } from '@/components/patch-mark';
 import { HeroEntry } from '@/components/hero-entry';
 import { banReason, suggestBans, threatGain, type MetaHero } from '@/lib/bans';
 import { LANES, type Lane } from '@/lib/draft';
@@ -111,6 +112,7 @@ export function BanList({ bans, unavailable, portraits, meta, onChange }: Props)
                   <span className="ps-2" />
                 )}
                 <span>{m.hero}</span>
+                <PatchMark hero={m.hero} />
                 {/* On a phone the win rate alone, so two or three fit a line. */}
                 <span className="text-xs text-muted-foreground sm:hidden">{t.banShort(Math.round(m.win * 100))}</span>
                 <span className="hidden text-xs text-muted-foreground sm:inline">{banReason(m, t.banReason)}</span>

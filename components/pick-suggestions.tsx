@@ -1,6 +1,7 @@
 'use client';
 
 import { GameImage } from '@/components/game-image';
+import { PatchMark } from '@/components/patch-mark';
 import { Skeleton } from '@/components/ui/skeleton';
 import { pickReason, type Ranked } from '@/lib/matchups';
 import { tellingFills } from '@/lib/team-balance';
@@ -100,6 +101,7 @@ export function PickSuggestions({ ranked, ai, heading, waiting, portraits, onPic
               )}
               <span className="py-1">
                 <span>{hero}</span>
+                <PatchMark hero={hero} className="ms-1 align-[-2px]" />
                 {reason && <span className="ms-1.5 text-xs text-muted-foreground">{reason}</span>}
                 {data?.fills?.filter((gap) => telling.has(gap)).map((gap) => (
                   <span key={gap} className="ms-1.5 text-xs text-primary">{t.fills[gap]}</span>

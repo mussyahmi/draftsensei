@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { GameImage } from '@/components/game-image';
+import { PatchMark } from '@/components/patch-mark';
 import { InstantBuild, type TopBuild } from '@/components/instant-build';
 import { AccountButton } from '@/components/account-button';
 import { BestLanes } from '@/components/best-lanes';
@@ -16,6 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { WinRate } from '@/components/win-rate';
 import type { MetaHero } from '@/lib/bans';
 import { bestLanes, usualLanes } from '@/lib/best-lanes';
+import { isSettling, PATCH, patchChange } from '@/lib/patch';
+import { agoFrom, agoText } from '@/lib/updated';
 import type { Release } from '@/lib/changelog';
 import { LANES, newPool, RANKS, searchHeroes, type Lane, type Pool, type Rank } from '@/lib/draft';
 import type { HeroDetail, HeroEdge } from '@/lib/hero-detail';
@@ -178,6 +181,7 @@ function HeroPanel({
   const info = detail?.key === detailKey ? detail : null;
   const shownBuild = build?.key === buildKey ? build : null;
   const listed = (pool[lane] ?? []).includes(hero);
+  const change = patchChange(hero);
 
   return (
     <div className="space-y-4 border-t border-border bg-card/60 p-3">
@@ -213,6 +217,15 @@ function HeroPanel({
         </button>
       </div>
 
+      {change && (
+        <p className="flex items-center gap-1.5 text-sm">
+          <PatchMark hero={hero} />
+          <span>
+            {change.change === 'buff' ? t.patchBuff : change.change === 'nerf' ? t.patchNerf : t.patchAdjust}
+            {change.note && <span className="text-muted-foreground">: {change.note}</span>}
+          </span>
+        </p>
+      )}
       {!info && <DetailLoading label={t.heroLoading} />}
       {info && !info.value && <p className="text-sm text-muted-foreground">{t.heroNoData}</p>}
       {info?.value && (
@@ -236,11 +249,15 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
   const [rank, setRank] = useState<Rank>('all');
   const [pool, setPool] = useState<Pool>(newPool);
   const [ready, setReady] = useState(false);
-  const [meta, setMeta] = useState<{ rank: Rank; heroes: MetaHero[] } | null>(null);
+  // With when the server fetched them, and when they arrived here, for how fresh they are.
+  const [meta, setMeta] = useState<{ rank: Rank; heroes: MetaHero[]; at: number | null; seen: number } | null>(null);
   const [portraits, setPortraits] = useState<Record<string, string | null>>({});
   const [lane, setLane] = useState<Lane | 'all'>('all');
   const [sort, setSort] = useState<{ key: SortKey; down: boolean }>({ key: 'win', down: true });
   const [query, setQuery] = useState('');
+  const [patchOnly, setPatchOnly] = useState(false);
+  // Depends on today, so it is worked out in the browser, not at build time.
+  const [settling, setSettling] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
   const [accountProblem, setAccountProblem] = useState<((t: Strings) => string) | null>(null);
@@ -255,6 +272,7 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
     setLang(saved.updatedAt ? saved.draft.lang : langFor(navigator.language));
     setRank(saved.draft.rank);
     setPool(loadPool());
+    setSettling(isSettling(new Date()));
     setReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -271,11 +289,16 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
 
   useEffect(() => {
     if (!ready) return;
-    return retryUntil<MetaHero[]>(
-      () => fetch(`/api/bans?rank=${rank}`).then((r) => (r.ok ? r.json() : [])),
-      [],
-      (heroes) => heroes.length > 0,
-      (heroes) => setMeta({ rank, heroes }),
+    type Answer = { heroes: MetaHero[]; at: number | null };
+    return retryUntil<Answer>(
+      () =>
+        fetch(`/api/bans?rank=${rank}`).then(async (r) => ({
+          heroes: r.ok ? await r.json() : [],
+          at: Number(r.headers.get('x-data-at')) || null,
+        })),
+      { heroes: [], at: null },
+      (answer) => answer.heroes.length > 0,
+      (answer) => setMeta({ rank, ...answer, seen: Date.now() }),
     );
   }, [ready, rank]);
 
@@ -291,15 +314,29 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
   };
 
   const heroes = meta?.rank === rank ? meta.heroes : null;
+  const fresh = meta?.rank === rank && meta.at ? { at: meta.at, seen: meta.seen } : null;
+  const freshness = [
+    PATCH.version && t.dataPatch(PATCH.version),
+    fresh && t.dataUpdated(agoText(agoFrom(fresh.at, fresh.seen), lang, t.justNow)),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const lanes = heroes ? bestLanes(heroes, usualLanes()) : [];
   const mine = heroes ? bestLanes(heroes, pool) : [];
   const found = query.trim() ? new Set(searchHeroes(query, HEROES)) : null;
   const shown = (heroes ?? [])
-    .filter((m) => (lane === 'all' || playsLane(m.hero, lane)) && (!found || found.has(m.hero)))
+    .filter(
+      (m) =>
+        (lane === 'all' || playsLane(m.hero, lane)) &&
+        (!found || found.has(m.hero)) &&
+        (!patchOnly || patchChange(m.hero)),
+    )
     .sort((a, b) => {
       const gap = (b[sort.key] ?? -1) - (a[sort.key] ?? -1);
       return sort.down ? gap : 0 - gap;
     });
+
+  const patchCount = Object.keys(PATCH.heroes).length;
 
   const columns: { key: SortKey; label: string }[] = [
     { key: 'win', label: t.heroWin },
@@ -339,6 +376,9 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
         <div>
           <h2 className="font-display text-lg uppercase tracking-wide">{t.heroesTitle}</h2>
           <p className="text-sm text-muted-foreground">{t.heroesHint}</p>
+          {/* The hint above already says it is this week's games. */}
+          {freshness && <p className="mt-1 text-xs text-muted-foreground">{freshness}</p>}
+          {settling && <p className="mt-1 text-sm text-primary">{t.patchSettling(PATCH.version)}</p>}
         </div>
 
         <BestLanes loading={!heroes} lanes={lanes} mine={mine} selected={lane} portraits={portraits} onLane={setLane} />
@@ -390,6 +430,17 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
           ))}
         </div>
 
+        {patchCount > 0 && (
+          <button
+            type="button"
+            aria-pressed={patchOnly}
+            onClick={() => setPatchOnly((on) => !on)}
+            className={cn('min-h-9 rounded-md px-3 text-xs', patchOnly ? chipOn : chipOff)}
+          >
+            {t.patchOnly(patchCount)}
+          </button>
+        )}
+
         {!heroes && <ListLoading label={t.heroLoading} />}
         {heroes && !heroes.length && <p className="text-sm text-muted-foreground">{t.heroNoData}</p>}
         {heroes && heroes.length > 0 && (
@@ -435,6 +486,7 @@ export function HeroesPage({ releases }: { releases: Release[] }) {
                         <span className="size-8 shrink-0 rounded-full bg-muted" />
                       )}
                       <span className="truncate text-sm">{m.hero}</span>
+                      <PatchMark hero={m.hero} />
                     </span>
                     <WinRate win={m.win} className="justify-end" />
                     <span className="text-end text-xs tabular-nums text-muted-foreground">{percent(m.ban)}</span>
